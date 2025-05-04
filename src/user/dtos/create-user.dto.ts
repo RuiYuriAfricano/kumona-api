@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsNotEmpty, IsPhoneNumber, isString, isNotIn, isNotEmpty } from 'class-validator';
+import { IsString, IsEmail, IsNotEmpty, IsPhoneNumber, isString, isNotIn, isNotEmpty, IsEmpty } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -18,6 +18,6 @@ export class CreateUserDto {
   phone: string;
 
   @IsString()
-  @IsNotEmpty()
-  role: string; // "consumer" or "producer"
+  @IsEmpty()
+  photo: string; // base64
 }
