@@ -1,99 +1,247 @@
+# Kumona Vision Care API
+
+API RESTful para o aplicativo Kumona Vision Care, uma solução de saúde ocular com diagnóstico por IA.
+
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <img src="https://via.placeholder.com/200x200.png?text=Kumona+Vision" alt="Kumona Vision Care Logo" width="200" />
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 📋 Índice
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- [Visão Geral](#visão-geral)
+- [Tecnologias](#tecnologias)
+- [Requisitos](#requisitos)
+- [Instalação](#instalação)
+- [Configuração](#configuração)
+- [Uso](#uso)
+- [Endpoints da API](#endpoints-da-api)
+- [Banco de Dados](#banco-de-dados)
+- [Testes](#testes)
+- [Implantação](#implantação)
+- [Contribuição](#contribuição)
+- [Licença](#licença)
 
-## Description
+## 🔍 Visão Geral
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+O Kumona Vision Care é um aplicativo de saúde ocular que utiliza inteligência artificial para diagnóstico de condições oculares através de imagens. Esta API fornece todos os endpoints necessários para suportar o aplicativo, incluindo autenticação de usuários, análise de imagens, recomendações personalizadas e acompanhamento de progresso.
 
-## Project setup
+### Principais Funcionalidades
 
-```bash
-$ npm install
-```
+- Autenticação segura com JWT
+- Upload e análise de imagens oculares
+- Diagnóstico de condições oculares com IA
+- Recomendações personalizadas
+- Rastreamento de atividades de prevenção
+- Estatísticas e gráficos de progresso
+- Suporte a múltiplos idiomas
 
-## Compile and run the project
+## 🛠️ Tecnologias
 
-```bash
-# development
-$ npm run start
+- [NestJS](https://nestjs.com/) - Framework para construção de aplicações server-side eficientes e escaláveis
+- [Prisma](https://www.prisma.io/) - ORM para acesso ao banco de dados
+- [PostgreSQL](https://www.postgresql.org/) - Banco de dados relacional
+- [JWT](https://jwt.io/) - JSON Web Tokens para autenticação
+- [Swagger](https://swagger.io/) - Documentação da API
+- [Jest](https://jestjs.io/) - Framework de testes
+- [Docker](https://www.docker.com/) - Containerização
+- [GitHub Actions](https://github.com/features/actions) - CI/CD
 
-# watch mode
-$ npm run start:dev
+## 📋 Requisitos
 
-# production mode
-$ npm run start:prod
-```
+- Node.js (v18 ou superior)
+- npm (v8 ou superior)
+- PostgreSQL (v14 ou superior)
+- Docker (opcional, para containerização)
 
-## Run tests
+## 🚀 Instalação
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+1. Clone o repositório:
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+git clone https://github.com/seu-usuario/kumona-api.git
+cd kumona-api
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+2. Instale as dependências:
 
-## Resources
+```bash
+npm install
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+3. Crie um arquivo `.env` baseado no `.env.example`:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+cp .env.example .env
+```
 
-## Support
+4. Configure as variáveis de ambiente no arquivo `.env` (veja a seção [Configuração](#configuração)).
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+5. Execute as migrações do banco de dados:
 
-## Stay in touch
+```bash
+npx prisma migrate dev
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+6. Inicie o servidor de desenvolvimento:
 
-## License
+```bash
+npm run start:dev
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## ⚙️ Configuração
+
+Configure as seguintes variáveis de ambiente no arquivo `.env`:
+
+```
+# Configuração do Banco de Dados
+DATABASE_URL=postgresql://username:password@hostname:port/database
+
+# Configuração JWT
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRATION=24h
+
+# Configuração do Servidor
+PORT=3000
+NODE_ENV=development
+
+# Configuração de Serviço de IA (para integração futura)
+AI_SERVICE_URL=https://api.example.com/vision
+AI_SERVICE_API_KEY=your-api-key-here
+```
+
+## 📝 Uso
+
+### Iniciar o servidor
+
+```bash
+# Desenvolvimento
+npm run start:dev
+
+# Produção
+npm run build
+npm run start:prod
+```
+
+### Acessar a documentação da API
+
+Após iniciar o servidor, acesse a documentação Swagger em:
+
+```
+http://localhost:3000/api
+```
+
+## 🔌 Endpoints da API
+
+### Autenticação
+
+- `POST /auth/register` - Registro de novos usuários
+- `POST /auth/login` - Login de usuários
+
+### Usuários
+
+- `GET /users/profile` - Obter perfil do usuário
+- `PUT /users/profile` - Atualizar perfil do usuário
+
+### Diagnóstico
+
+- `POST /diagnosis/analyze` - Enviar imagem para análise
+- `GET /diagnosis/history` - Obter histórico de diagnósticos
+- `GET /diagnosis/:id` - Obter detalhes de um diagnóstico específico
+
+### Prevenção
+
+- `GET /prevention/tips` - Obter dicas de prevenção
+- `GET /prevention/exercises` - Obter exercícios oculares recomendados
+- `POST /prevention/track` - Registrar atividade de prevenção
+- `GET /prevention/activities` - Obter atividades do usuário
+
+### Progresso
+
+- `GET /progress/summary` - Obter resumo do progresso
+- `GET /progress/charts` - Obter dados para gráficos de progresso
+
+## 💾 Banco de Dados
+
+O projeto utiliza o Prisma como ORM para interagir com o banco de dados PostgreSQL. O schema do banco de dados está definido em `prisma/schema.prisma`.
+
+### Modelos Principais
+
+- `User` - Informações do usuário
+- `MedicalHistory` - Histórico médico do usuário
+- `UserPreferences` - Preferências do usuário
+- `Diagnosis` - Diagnósticos realizados
+- `PreventionActivity` - Atividades de prevenção registradas
+- `PreventionTip` - Dicas de prevenção
+- `EyeExercise` - Exercícios oculares
+
+### Comandos Úteis do Prisma
+
+```bash
+# Gerar cliente Prisma
+npx prisma generate
+
+# Criar migração
+npx prisma migrate dev --name nome_da_migracao
+
+# Aplicar migrações em produção
+npx prisma migrate deploy
+
+# Visualizar banco de dados
+npx prisma studio
+```
+
+## 🧪 Testes
+
+### Executar testes unitários
+
+```bash
+npm test
+```
+
+### Executar testes de integração
+
+```bash
+npm run test:e2e
+```
+
+### Verificar cobertura de testes
+
+```bash
+npm run test:cov
+```
+
+## 🚢 Implantação
+
+### Usando Docker
+
+1. Construa a imagem Docker:
+
+```bash
+docker build -t kumona-api .
+```
+
+2. Execute o contêiner:
+
+```bash
+docker run -p 3000:3000 --env-file .env kumona-api
+```
+
+### CI/CD com GitHub Actions
+
+O projeto inclui um workflow de GitHub Actions para:
+
+1. Executar testes automaticamente em cada pull request
+2. Construir e publicar a imagem Docker quando o código é mesclado na branch principal
+3. Implantar automaticamente em um ambiente de produção
+
+## 👥 Contribuição
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Faça commit das suas alterações (`git commit -m 'Adiciona nova feature'`)
+4. Faça push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.

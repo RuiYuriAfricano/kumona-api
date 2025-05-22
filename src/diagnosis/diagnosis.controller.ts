@@ -1,0 +1,110 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+  UseInterceptors,
+  UploadedFile,
+  Query,
+  ParseIntPipe
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+  ApiQuery
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DiagnosisService } from './diagnosis.service';
+import { CreateDiagnosisDto } from './dto/create-diagnosis.dto';
+
+@ApiTags('diagnosis')
+@ApiBearerAuth()
+@Controller('diagnosis')
+export class DiagnosisController {
+  constructor(private diagnosisService: DiagnosisService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Post('analyze')
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiOperation({
+    summary: 'Analisar imagem ocular',
+    description: 'Envia uma imagem do olho para análise pela IA e retorna um diagnóstico detalhado'
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'Imagem do olho para análise'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Imagem analisada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Imagem inválida ou não fornecida' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 500, description: 'Erro ao processar a imagem' })
+  async analyzeImage(
+    @Request() req,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.diagnosisService.analyzeImage(req.user.id, file);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('history')
+  @ApiOperation({
+    summary: 'Obter histórico de diagnósticos',
+    description: 'Retorna o histórico de diagnósticos do usuário com opções de paginação e filtro por data'
+  })
+  @ApiQuery({ name: 'limit', required: false, description: 'Número máximo de registros a retornar', type: Number })
+  @ApiQuery({ name: 'page', required: false, description: 'Número da página para paginação', type: Number })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Data inicial para filtro (formato ISO)', type: String })
+  @ApiQuery({ name: 'endDate', required: false, description: 'Data final para filtro (formato ISO)', type: String })
+  @ApiResponse({ status: 200, description: 'Histórico de diagnósticos retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getDiagnosisHistory(
+    @Request() req,
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.diagnosisService.getDiagnosisHistory(
+      req.user.id,
+      limit,
+      page,
+      startDate,
+      endDate,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Obter diagnóstico por ID',
+    description: 'Retorna os detalhes completos de um diagnóstico específico'
+  })
+  @ApiParam({ name: 'id', description: 'ID do diagnóstico', type: Number })
+  @ApiResponse({ status: 200, description: 'Diagnóstico retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Diagnóstico não encontrado' })
+  async getDiagnosisById(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.diagnosisService.getDiagnosisById(req.user.id, id);
+  }
+}
