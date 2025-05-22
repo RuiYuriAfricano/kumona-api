@@ -66,12 +66,18 @@ export class UserService {
     await this.getUserById(id);
 
     // Extrair campos aninhados para atualização separada
-    const { medicalHistory, preferences, ...userData } = data;
+    const { medicalHistory, preferences, birthDate, ...userData } = data;
+
+    // Preparar dados do usuário com conversão de data se necessário
+    const updateData = {
+      ...userData,
+      ...(birthDate && { birthDate: new Date(birthDate) }),
+    };
 
     // Atualizar o usuário
     const updatedUser = await this.prisma.user.update({
       where: { id },
-      data: userData,
+      data: updateData,
       include: {
         medicalHistory: true,
         preferences: true,

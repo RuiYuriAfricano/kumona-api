@@ -28,13 +28,16 @@ export class AuthService {
     // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Converter a data de nascimento para o formato ISO-8601 DateTime completo
+    const formattedBirthDate = new Date(birthDate);
+
     // Criar o usuário
     const user = await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
-        birthDate,
+        birthDate: formattedBirthDate,
         medicalHistory: {
           create: {
             existingConditions: [],
@@ -112,11 +115,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub, deleted: false },
     });
-    
+
     if (!user) {
       throw new UnauthorizedException('Usuário não encontrado ou inativo');
     }
-    
+
     return user;
   }
 }
