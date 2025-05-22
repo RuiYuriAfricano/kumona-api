@@ -122,4 +122,22 @@ export class AuthService {
 
     return user;
   }
+
+  async verifyJwt(token: string): Promise<JwtPayload | null> {
+    try {
+      const payload = this.jwtService.verify(token) as JwtPayload;
+      // Verificar se o usuário existe e está ativo
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub, deleted: false },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return payload;
+    } catch (error) {
+      return null;
+    }
+  }
 }

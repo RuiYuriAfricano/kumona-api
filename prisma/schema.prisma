@@ -13,16 +13,19 @@ model User {
   email           String              @unique
   password        String
   birthDate       DateTime
-  profileImage    String?             @default("Default_pfp.jpg")
+  about           String?
+  phone           String?
+  profileImage    String?             @default(env("DEFAULT_PROFILEIMAGE"))
   deleted         Boolean             @default(false)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
-  
+
   // Relações
   diagnoses       Diagnosis[]
   preventionActivities PreventionActivity[]
   medicalHistory  MedicalHistory?
   preferences     UserPreferences?
+  notifications   Notification[]
 }
 
 model MedicalHistory {
@@ -88,4 +91,15 @@ model EyeExercise {
   imageUrl     String?
   videoUrl     String?
   createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  title     String
+  message   String
+  type      String   // info, success, warning, error
+  read      Boolean  @default(false)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }

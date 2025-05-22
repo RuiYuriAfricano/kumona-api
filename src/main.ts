@@ -2,15 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Configurar CORS
   app.enableCors({
-    origin: '*',
+    origin: '*', // Em produção, defina para a origem específica do seu frontend
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
   // Configurar validação global
@@ -41,6 +43,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  // Aumentar limite para 50MB, por exemplo
+  app.use(bodyParser.json({ limit: '50mb' }));
+  app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
   // Definir porta do servidor via variável de ambiente ou padrão 3000
   const PORT = process.env.PORT || 3000;
   await app.listen(PORT);

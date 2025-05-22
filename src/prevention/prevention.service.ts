@@ -1,14 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePreventionActivityDto } from './dto/create-prevention-activity.dto';
+import { PreventionActivityDto } from './dto/prevention-activity.dto';
+import { PreventionTipDto } from './dto/prevention-tip.dto';
+import { EyeExerciseDto } from './dto/eye-exercise.dto';
+import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class PreventionService {
   constructor(private prisma: PrismaService) {}
 
-  async getPreventionTips(category?: string, limit = 10) {
+  async getPreventionTips(category?: string, limit = 10): Promise<PreventionTipDto[]> {
     const where = category ? { category } : {};
-    
+
     return this.prisma.preventionTip.findMany({
       where,
       take: limit,
@@ -18,7 +22,7 @@ export class PreventionService {
     });
   }
 
-  async getEyeExercises() {
+  async getEyeExercises(): Promise<EyeExerciseDto[]> {
     return this.prisma.eyeExercise.findMany({
       orderBy: {
         createdAt: 'desc',
@@ -26,10 +30,7 @@ export class PreventionService {
     });
   }
 
-  async trackPreventionActivity(
-    userId: number,
-    createActivityDto: CreatePreventionActivityDto,
-  ) {
+  async trackPreventionActivity(userId: number, activityDto: CreatePreventionActivityDto): Promise<PreventionActivityDto> {
     // Verificar se o usuário existe
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deleted: false },
@@ -39,15 +40,80 @@ export class PreventionService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
+    // Validar o tipo de atividade
+    if (!['exercise', 'rest', 'medication'].includes(activityDto.type)) {
+      throw new BadRequestException('Tipo de atividade inválido');
+    }
+
     // Criar a atividade de prevenção
     const activity = await this.prisma.preventionActivity.create({
       data: {
-        ...createActivityDto,
+        type: activityDto.type,
+        description: activityDto.description,
+        duration: activityDto.duration,
+        notes: activityDto.notes,
         userId,
       },
     });
 
     return activity;
+  }
+
+  async getPreventionActivities(
+    userId: number,
+    page = 1,
+    limit = 10,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<PaginatedResponseDto<PreventionActivityDto>> {
+    // Verificar se o usuário existe
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, deleted: false },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Construir filtro de data se fornecido
+    const dateFilter = {};
+    if (startDate) {
+      dateFilter['gte'] = new Date(startDate);
+    }
+    if (endDate) {
+      dateFilter['lte'] = new Date(endDate);
+    }
+
+    // Construir where com filtros
+    const where: any = { userId };
+    if (Object.keys(dateFilter).length > 0) {
+      where.completedAt = dateFilter;
+    }
+
+    // Buscar atividades
+    const activities = await this.prisma.preventionActivity.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: {
+        completedAt: 'desc',
+      },
+    });
+
+    // Contar total para paginação
+    const total = await this.prisma.preventionActivity.count({ where });
+
+    return {
+      data: activities,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getUserActivities(userId: number) {

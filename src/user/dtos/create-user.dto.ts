@@ -16,8 +16,4 @@ export class CreateUserDto {
   @IsPhoneNumber('AO')
   @IsNotEmpty()
   phone: string;
-
-  @IsString()
-  @IsEmpty()
-  photo: string; // base64
 }

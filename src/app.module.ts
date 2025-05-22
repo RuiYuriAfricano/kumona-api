@@ -8,6 +8,8 @@ import { DiagnosisModule } from './diagnosis/diagnosis.module';
 import { PreventionModule } from './prevention/prevention.module';
 import { ProgressModule } from './progress/progress.module';
 import { AiModule } from './ai/ai.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { WebsocketModule } from './websocket/websocket.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -24,6 +26,8 @@ import configuration from './config/configuration';
     PreventionModule,
     ProgressModule,
     AiModule,
+    NotificationsModule,
+    WebsocketModule,
   ],
   providers: [PrismaService],
 })

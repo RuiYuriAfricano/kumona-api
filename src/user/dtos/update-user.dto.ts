@@ -48,7 +48,15 @@ export class UpdateUserDto {
 
   @IsString()
   @IsOptional()
+  about?: string;
+
+  @IsString()
+  @IsOptional()
   profileImage?: string;
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
 
   @IsOptional()
   @Type(() => UpdateMedicalHistoryDto)
