@@ -10,6 +10,9 @@ import { ProgressModule } from './progress/progress.module';
 import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { HealthController } from './health.controller';
+import { AppModule as AppInfoModule } from './app/app.module';
+import { HelpModule } from './help/help.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -28,7 +31,10 @@ import configuration from './config/configuration';
     AiModule,
     NotificationsModule,
     WebsocketModule,
+    AppInfoModule,
+    HelpModule,
   ],
+  controllers: [HealthController],
   providers: [PrismaService],
 })
 export class AppModule {}

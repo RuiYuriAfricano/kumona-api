@@ -133,8 +133,8 @@ export class DiagnosisController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async getDiagnosisHistory(
     @Request() req,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {

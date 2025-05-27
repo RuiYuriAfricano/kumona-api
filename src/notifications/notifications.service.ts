@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { NotificationDto } from './dto/notification.dto';
 import { ReadNotificationResponseDto } from './dto/read-notification.dto';
 import { ReadAllNotificationsResponseDto } from './dto/read-all-notifications.dto';
@@ -11,7 +12,8 @@ export class NotificationsService {
 
   constructor(
     private prisma: PrismaService,
-    private websocketService: WebsocketService
+    private websocketService: WebsocketService,
+    private emailService: EmailService
   ) {}
 
   async getUserNotifications(userId: number): Promise<NotificationDto[]> {
@@ -129,6 +131,8 @@ export class NotificationsService {
     title: string,
     message: string,
     type: string,
+    sendEmail: boolean = false,
+    emailSubject?: string,
   ): Promise<NotificationDto> {
     // Criar a notificação no banco de dados
     const notification = await this.prisma.notification.create({
@@ -141,6 +145,28 @@ export class NotificationsService {
     });
 
     this.logger.log(`Notificação criada para o usuário ${userId}: ${title}`);
+
+    // Enviar email se solicitado
+    if (sendEmail) {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true, name: true },
+        });
+
+        if (user) {
+          await this.emailService.sendNotificationEmail(
+            user.email,
+            emailSubject || title,
+            message,
+            user.name
+          );
+          this.logger.log(`Email de notificação enviado para ${user.email}`);
+        }
+      } catch (emailError) {
+        this.logger.error('Erro ao enviar email de notificação:', emailError);
+      }
+    }
 
     // Enviar notificação via WebSocket se o usuário estiver conectado
     if (this.websocketService.isUserConnected(userId)) {
@@ -155,6 +181,56 @@ export class NotificationsService {
     }
 
     return notification;
+  }
+
+  // Método para enviar notificação de resultado de diagnóstico
+  async sendDiagnosisResultNotification(userId: number, diagnosisResult: any): Promise<NotificationDto> {
+    const severity = diagnosisResult.severity || 'low';
+    let title = 'Resultado do Diagnóstico Disponível';
+    let message = `Seu diagnóstico foi concluído. Resultado: ${diagnosisResult.condition}`;
+    let type = 'info';
+
+    // Personalizar mensagem baseada na severidade
+    if (severity === 'high') {
+      type = 'error';
+      title = '⚠️ Diagnóstico Requer Atenção';
+      message = `Seu diagnóstico indica: ${diagnosisResult.condition}. Recomendamos consultar um oftalmologista o mais breve possível.`;
+    } else if (severity === 'medium') {
+      type = 'warning';
+      title = '🔍 Diagnóstico Disponível';
+      message = `Seu diagnóstico indica: ${diagnosisResult.condition}. Considere agendar uma consulta para avaliação.`;
+    } else {
+      type = 'success';
+      title = '✅ Diagnóstico Concluído';
+      message = `Seu diagnóstico indica: ${diagnosisResult.condition}. Continue cuidando bem da sua visão!`;
+    }
+
+    return this.createNotification(userId, title, message, type, true, title);
+  }
+
+  // Método para enviar lembrete de prevenção
+  async sendPreventionReminder(userId: number, reminderType: string): Promise<NotificationDto> {
+    const reminders = {
+      'eye-rest': {
+        title: '👁️ Hora de Descansar os Olhos',
+        message: 'Lembre-se de fazer uma pausa e descansar os olhos por alguns minutos. Olhe para longe da tela!',
+      },
+      'eye-drops': {
+        title: '💧 Hora do Colírio',
+        message: 'Não esqueça de usar seu colírio lubrificante conforme recomendado.',
+      },
+      'checkup': {
+        title: '📅 Lembrete de Consulta',
+        message: 'Está na hora de agendar sua consulta oftalmológica de rotina.',
+      },
+    };
+
+    const reminder = reminders[reminderType] || {
+      title: '🔔 Lembrete de Saúde Ocular',
+      message: 'Cuide bem da sua visão!',
+    };
+
+    return this.createNotification(userId, reminder.title, reminder.message, 'info', true, reminder.title);
   }
 
   // Método para enviar uma notificação para todos os usuários

@@ -69,12 +69,16 @@ export class DiagnosisService {
 
   async getDiagnosisHistory(
     userId: number,
-    limit = 10,
-    page = 1,
+    limit?: string | number,
+    page?: string | number,
     startDate?: string,
     endDate?: string,
   ) {
-    const skip = (page - 1) * limit;
+    // Converter parâmetros para números com valores padrão
+    const limitNum = limit ? parseInt(limit.toString(), 10) : 10;
+    const pageNum = page ? parseInt(page.toString(), 10) : 1;
+
+    const skip = (pageNum - 1) * limitNum;
 
     // Construir filtro de data se fornecido
     const dateFilter = {};
@@ -95,7 +99,7 @@ export class DiagnosisService {
     const diagnoses = await this.prisma.diagnosis.findMany({
       where,
       skip,
-      take: limit,
+      take: limitNum,
       orderBy: {
         createdAt: 'desc',
       },
@@ -108,9 +112,9 @@ export class DiagnosisService {
       data: diagnoses,
       meta: {
         total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }

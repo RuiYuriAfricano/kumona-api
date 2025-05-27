@@ -1,8 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -27,5 +31,65 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Solicitar recuperação de senha',
+    description: 'Envia um email com link para redefinir a senha'
+  })
+  @ApiBody({ type: ForgotPasswordDto, description: 'Email para recuperação' })
+  @ApiResponse({ status: 200, description: 'Email de recuperação enviado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Email não encontrado' })
+  @ApiResponse({ status: 400, description: 'Dados de entrada inválidos' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto, @Req() req: Request) {
+    // Capturar o host dinâmico da requisição
+    const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+    const host = req.get('host') || req.get('x-forwarded-host') || 'localhost:5173';
+    const frontendUrl = `${protocol}://${host}`;
+
+    return this.authService.forgotPassword(forgotPasswordDto, frontendUrl);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Redefinir senha',
+    description: 'Redefine a senha do usuário usando o token de recuperação'
+  })
+  @ApiBody({ type: ResetPasswordDto, description: 'Token e nova senha' })
+  @ApiResponse({ status: 200, description: 'Senha redefinida com sucesso' })
+  @ApiResponse({ status: 400, description: 'Token inválido ou expirado' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('google/signup')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Cadastro com Google',
+    description: 'Cria uma nova conta usando credenciais do Google OAuth'
+  })
+  @ApiBody({ type: GoogleAuthDto, description: 'Dados de cadastro do Google' })
+  @ApiResponse({ status: 201, description: 'Cadastro com Google realizado com sucesso' })
+  @ApiResponse({ status: 409, description: 'Usuário já existe' })
+  @ApiResponse({ status: 401, description: 'Falha na autenticação com Google' })
+  async googleSignUp(@Body() googleAuthDto: GoogleAuthDto) {
+    return this.authService.googleSignUp(googleAuthDto);
+  }
+
+  @Post('google/signin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Login com Google',
+    description: 'Faz login usando credenciais do Google OAuth (apenas para usuários já cadastrados via Google)'
+  })
+  @ApiBody({ type: GoogleAuthDto, description: 'Dados de login do Google' })
+  @ApiResponse({ status: 200, description: 'Login com Google realizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Usuário não encontrado ou conta criada com email/senha' })
+  async googleSignIn(@Body() googleAuthDto: GoogleAuthDto) {
+    return this.authService.googleSignIn(googleAuthDto);
   }
 }

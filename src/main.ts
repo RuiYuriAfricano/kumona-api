@@ -7,12 +7,22 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Configurar CORS
+  // Configurar CORS - Permitir qualquer origem
   app.enableCors({
-    origin: '*', // Em produção, defina para a origem específica do seu frontend
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    origin: true, // Permite qualquer origem
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers'
+    ],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   // Configurar validação global

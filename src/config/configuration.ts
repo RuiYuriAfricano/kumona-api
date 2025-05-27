@@ -23,5 +23,9 @@ export default () => ({
     password: process.env.EMAIL_PASSWORD,
     from: process.env.EMAIL_FROM || 'noreply@kumonavision.com',
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  },
   environment: process.env.NODE_ENV || 'development',
 });

@@ -15,7 +15,7 @@ model User {
   birthDate       DateTime
   about           String?
   phone           String?
-  profileImage    String?             @default(env("DEFAULT_PROFILEIMAGE"))
+  profileImage    String?             @default("https://www.w3schools.com/howto/img_avatar.png")
   deleted         Boolean             @default(false)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -60,6 +60,7 @@ model Diagnosis {
   recommendations String[]
   userId          Int
   user            User     @relation(fields: [userId], references: [id])
+  eyeImages       EyeImage[]
   createdAt       DateTime @default(now())
 }
 
@@ -102,4 +103,13 @@ model Notification {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model EyeImage {
+  id          Int      @id @default(autoincrement())
+  url         String
+  type        String   // left, right, both
+  diagnosisId Int?
+  diagnosis   Diagnosis? @relation(fields: [diagnosisId], references: [id])
+  createdAt   DateTime @default(now())
 }

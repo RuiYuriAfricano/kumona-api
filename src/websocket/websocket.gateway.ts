@@ -16,7 +16,7 @@ import { WebsocketService } from './websocket.service';
     origin: '*', // Em produção, defina para a origem específica do seu frontend
     credentials: true,
   },
-  namespace: 'ws',
+  path: '/ws',
 })
 export class WebsocketGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -39,8 +39,13 @@ export class WebsocketGateway
   async handleConnection(client: Socket) {
     try {
       // Extrair o token do handshake
-      const token = client.handshake.auth.token || 
+      const token = client.handshake.auth.token ||
+                    client.handshake.query.token ||
                     client.handshake.headers.authorization?.split(' ')[1];
+
+      this.logger.log(`Token received: ${token ? 'Yes' : 'No'}`);
+      this.logger.log(`Auth object:`, client.handshake.auth);
+      this.logger.log(`Query object:`, client.handshake.query);
 
       if (!token) {
         this.logger.error('No token provided');
@@ -58,12 +63,12 @@ export class WebsocketGateway
 
       // Armazenar o ID do usuário no socket
       client.data.userId = payload.sub;
-      
+
       // Registrar a conexão no serviço
       this.websocketService.registerConnection(client);
-      
+
       this.logger.log(`Client connected: ${client.id}, User ID: ${payload.sub}`);
-      
+
       // Enviar mensagem de boas-vindas
       client.emit('connection_established', {
         message: 'Conectado com sucesso ao servidor WebSocket',
