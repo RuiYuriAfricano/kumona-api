@@ -47,8 +47,10 @@ export class PreventionController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async getPreventionTips(
     @Query('category') category?: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('limit') limitStr?: string,
   ): Promise<PreventionTipDto[]> {
+    // Converter limit para number se fornecido
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
     return this.preventionService.getPreventionTips(category, limit);
   }
 
@@ -112,11 +114,15 @@ export class PreventionController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   async getPreventionActivities(
     @Request() req,
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('page') pageStr?: string,
+    @Query('limit') limitStr?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ): Promise<PaginatedResponseDto<PreventionActivityDto>> {
+    // Converter page e limit para number se fornecidos
+    const page = pageStr ? parseInt(pageStr, 10) : undefined;
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+
     return this.preventionService.getPreventionActivities(
       req.user.id,
       page,

@@ -33,6 +33,55 @@ export class UserController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('settings')
+  @ApiOperation({ summary: 'Obter configurações do usuário', description: 'Retorna as configurações/preferências do usuário autenticado' })
+  @ApiResponse({ status: 200, description: 'Configurações retornadas com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async getUserSettings(@Request() req) {
+    const profile = await this.userService.getUserProfile(req.user.id);
+    return {
+      notificationsEnabled: profile.preferences?.notificationsEnabled ?? true,
+      emailNotifications: false, // Adicionar ao modelo se necessário
+      language: profile.preferences?.language ?? 'pt',
+      fontSize: 'Médio', // Adicionar ao modelo se necessário
+      dataUsage: 'Automático', // Adicionar ao modelo se necessário
+      reminderFrequency: profile.preferences?.reminderFrequency ?? 'daily'
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('settings')
+  @ApiOperation({ summary: 'Atualizar configurações do usuário', description: 'Atualiza as configurações/preferências do usuário autenticado' })
+  @ApiResponse({ status: 200, description: 'Configurações atualizadas com sucesso' })
+  @ApiResponse({ status: 400, description: 'Dados de entrada inválidos' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async updateUserSettings(@Request() req, @Body() settingsData: any) {
+    // Mapear configurações para o formato de preferências
+    const preferences: any = {};
+
+    if (settingsData.notificationsEnabled !== undefined) {
+      preferences.notificationsEnabled = settingsData.notificationsEnabled;
+    }
+    if (settingsData.language !== undefined) {
+      preferences.language = settingsData.language;
+    }
+    if (settingsData.reminderFrequency !== undefined) {
+      preferences.reminderFrequency = settingsData.reminderFrequency;
+    }
+
+    // Atualizar apenas as preferências
+    await this.userService.updateUser(req.user.id, { preferences });
+
+    return {
+      success: true,
+      settings: settingsData,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get()
   @ApiOperation({ summary: 'Listar todos os usuários', description: 'Retorna uma lista de todos os usuários ativos' })
   @ApiResponse({ status: 200, description: 'Lista de usuários retornada com sucesso' })

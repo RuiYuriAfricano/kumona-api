@@ -18,10 +18,10 @@ export class HelpController {
   async sendSupportMessage(@Body() supportData: SupportMessageDto) {
     // Simular envio de email ou salvamento no banco
     console.log('Mensagem de suporte recebida:', supportData);
-    
+
     // Aqui você poderia integrar com um serviço de email como SendGrid, Nodemailer, etc.
     // Ou salvar no banco de dados para análise posterior
-    
+
     return {
       success: true,
       message: 'Sua mensagem foi enviada com sucesso! Nossa equipe entrará em contato em breve.',
@@ -30,10 +30,10 @@ export class HelpController {
     };
   }
 
-  @Get('faq')
+  @Get('faqs')
   @ApiOperation({ summary: 'Obter perguntas frequentes' })
   @ApiResponse({ status: 200, description: 'FAQ retornado com sucesso' })
-  getFAQ() {
+  getFAQs() {
     return {
       categories: [
         {
