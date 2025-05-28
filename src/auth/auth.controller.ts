@@ -44,10 +44,16 @@ export class AuthController {
   @ApiResponse({ status: 404, description: 'Email não encontrado' })
   @ApiResponse({ status: 400, description: 'Dados de entrada inválidos' })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto, @Req() req: Request) {
-    // Capturar o host dinâmico da requisição
-    const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-    const host = req.get('host') || req.get('x-forwarded-host') || 'localhost:5173';
-    const frontendUrl = `${protocol}://${host}`;
+    // Usar URL do frontend baseada no ambiente
+    let frontendUrl: string;
+
+    if (process.env.NODE_ENV === 'production') {
+      // Em produção, usar a URL do Netlify
+      frontendUrl = 'https://kumona-vision-care.netlify.app';
+    } else {
+      // Em desenvolvimento, usar localhost
+      frontendUrl = 'http://localhost:5173';
+    }
 
     return this.authService.forgotPassword(forgotPasswordDto, frontendUrl);
   }

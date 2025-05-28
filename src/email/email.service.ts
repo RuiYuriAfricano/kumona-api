@@ -178,7 +178,7 @@ export class EmailService {
                 <p>Se você não solicitou esta recuperação de senha, pode ignorar este email com segurança.</p>
             </div>
             <div class="footer">
-                <p>© 2024 Kumona Vision Care - Cuidando da sua visão com tecnologia</p>
+                <p>© ${new Date().getFullYear()} Kumona Vision Care - Cuidando da sua visão com tecnologia</p>
                 <p>Este é um email automático, não responda a esta mensagem.</p>
             </div>
         </div>
@@ -239,7 +239,7 @@ export class EmailService {
                 <p>Estamos aqui para ajudar você a manter uma visão saudável. Se tiver dúvidas, nossa equipe está sempre disponível!</p>
             </div>
             <div class="footer">
-                <p>© 2024 Kumona Vision Care - Cuidando da sua visão com tecnologia</p>
+                <p>© ${new Date().getFullYear()} Kumona Vision Care - Cuidando da sua visão com tecnologia</p>
                 <p>Este é um email automático, não responda a esta mensagem.</p>
             </div>
         </div>
@@ -277,7 +277,7 @@ export class EmailService {
                 </div>
             </div>
             <div class="footer">
-                <p>© 2024 Kumona Vision Care - Cuidando da sua visão com tecnologia</p>
+                <p>© ${new Date().getFullYear()} Kumona Vision Care - Cuidando da sua visão com tecnologia</p>
                 <p>Este é um email automático, não responda a esta mensagem.</p>
             </div>
         </div>
