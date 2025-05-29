@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -16,6 +17,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -70,6 +73,18 @@ export class AuthService {
     } catch (error) {
       console.error('Erro ao enviar email de boas-vindas:', error);
       // Não falhar o registro por causa do email
+    }
+
+    // Criar notificação de boas-vindas
+    try {
+      await this.notificationsService.createNotification(
+        user.id,
+        '🎉 Bem-vindo ao Kumona Vision Care!',
+        `Olá ${user.name}! Sua conta foi criada com sucesso. Explore nossos recursos de diagnóstico e prevenção para cuidar da sua saúde ocular.`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de boas-vindas:', error);
     }
 
     // Gerar token JWT
@@ -314,6 +329,18 @@ export class AuthService {
       await this.emailService.sendWelcomeEmail(user.email, user.name);
     } catch (error) {
       console.error('Erro ao enviar email de boas-vindas:', error);
+    }
+
+    // Criar notificação de boas-vindas
+    try {
+      await this.notificationsService.createNotification(
+        user.id,
+        '🎉 Bem-vindo ao Kumona Vision Care!',
+        `Olá ${user.name}! Sua conta foi criada com sucesso via Google. Explore nossos recursos de diagnóstico e prevenção para cuidar da sua saúde ocular.`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de boas-vindas:', error);
     }
 
     // Gerar token JWT

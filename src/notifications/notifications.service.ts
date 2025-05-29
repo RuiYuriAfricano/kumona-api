@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { NotificationDto } from './dto/notification.dto';
@@ -12,6 +12,7 @@ export class NotificationsService {
 
   constructor(
     private prisma: PrismaService,
+    @Inject(forwardRef(() => WebsocketService))
     private websocketService: WebsocketService,
     private emailService: EmailService
   ) {}
