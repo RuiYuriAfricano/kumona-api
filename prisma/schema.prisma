@@ -26,6 +26,9 @@ model User {
   medicalHistory  MedicalHistory?
   preferences     UserPreferences?
   notifications   Notification[]
+  userTips        UserTip[]
+  userExercises   UserExercise[]
+  savedTips       SavedTip[]
 }
 
 model MedicalHistory {
@@ -117,3 +120,55 @@ model EyeImage {
   diagnosis   Diagnosis? @relation(fields: [diagnosisId], references: [id])
   createdAt   DateTime @default(now())
 }
+
+// Dicas personalizadas por usuário geradas por IA
+model UserTip {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  category    String
+  display     Boolean  @default(true) // Controls daily display rotation
+  generatedBy String   @default("ai") // ai, manual, system
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, display])
+  @@index([createdAt])
+}
+
+// Exercícios personalizados por usuário gerados por IA
+model UserExercise {
+  id           Int      @id @default(autoincrement())
+  title        String
+  description  String
+  instructions String[]
+  duration     Int      // minutes
+  category     String   // eye_movement, focus, relaxation, etc
+  display      Boolean  @default(true) // Controls daily display rotation
+  generatedBy  String   @default("ai") // ai, manual, system
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, display])
+  @@index([createdAt])
+}
+
+// Dicas salvas pelo usuário
+model SavedTip {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tipId     Int?     // Para dicas gerais (PreventionTip)
+  userTipId Int?     // Para dicas personalizadas (UserTip)
+  tipType   String   // 'general' ou 'personal'
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tipId, tipType])
+  @@unique([userId, userTipId, tipType])
+  @@index([userId])
+}
+

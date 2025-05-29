@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Query,
   Param,
@@ -202,5 +203,23 @@ export class PreventionController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async getUserSavedTips(@Request() req) {
     return this.preventionService.getUserSavedTips(req.user.id);
+  }
+
+  @Post('user/save-tip')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Salvar uma dica como favorita' })
+  @ApiResponse({ status: 201, description: 'Dica salva com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async saveTip(@Request() req, @Body() body: { tipId: number; tipType: 'general' | 'personal' }) {
+    return this.preventionService.saveTip(req.user.id, body.tipId, body.tipType);
+  }
+
+  @Delete('user/unsave-tip')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Remover uma dica dos salvos' })
+  @ApiResponse({ status: 200, description: 'Dica removida dos salvos com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async unsaveTip(@Request() req, @Body() body: { tipId: number; tipType: 'general' | 'personal' }) {
+    return this.preventionService.unsaveTip(req.user.id, body.tipId, body.tipType);
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PersonalizedContentService } from '../ai/personalized-content.service';
 import { CreatePreventionActivityDto } from './dto/create-prevention-activity.dto';
 import { PreventionActivityDto } from './dto/prevention-activity.dto';
 import { PreventionTipDto } from './dto/prevention-tip.dto';
@@ -8,7 +9,10 @@ import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class PreventionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private personalizedContentService: PersonalizedContentService
+  ) {}
 
   async getPreventionTips(userId: number, category?: string, limit = 10): Promise<PreventionTipDto[]> {
     // Para novos usuários, sempre retornar array vazio
@@ -110,17 +114,22 @@ export class PreventionService {
       return [];
     }
 
-    const tips = await this.prisma.preventionTip.findMany({
-      where: {
-        display: true // Só mostrar dicas marcadas para exibição
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    // Verificar se há dicas personalizadas ativas para hoje
+    const personalizedTips = await this.personalizedContentService.getDailyTips(userId);
 
-    console.log(`[getUserPreventionTips] Retornando ${tips.length} dicas para usuário ${userId}`);
-    return tips;
+    if (personalizedTips.length === 0) {
+      // Gerar dicas personalizadas se não existirem
+      console.log(`[getUserPreventionTips] Gerando dicas personalizadas para usuário ${userId}`);
+      await this.personalizedContentService.generateDailyTips(userId);
+
+      // Buscar as dicas recém-geradas
+      const newTips = await this.personalizedContentService.getDailyTips(userId);
+      console.log(`[getUserPreventionTips] ${newTips.length} dicas personalizadas geradas para usuário ${userId}`);
+      return newTips;
+    }
+
+    console.log(`[getUserPreventionTips] Retornando ${personalizedTips.length} dicas personalizadas para usuário ${userId}`);
+    return personalizedTips;
   }
 
   async getUserExercises(userId: number): Promise<EyeExerciseDto[]> {
@@ -136,63 +145,39 @@ export class PreventionService {
       return [];
     }
 
-    const exercises = await this.prisma.eyeExercise.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    // Verificar se há exercícios personalizados ativos para hoje
+    const personalizedExercises = await this.personalizedContentService.getDailyExercises(userId);
 
-    console.log(`[getUserExercises] Retornando ${exercises.length} exercícios para usuário ${userId}`);
-    return exercises;
+    if (personalizedExercises.length === 0) {
+      // Gerar exercícios personalizados se não existirem
+      console.log(`[getUserExercises] Gerando exercícios personalizados para usuário ${userId}`);
+      await this.personalizedContentService.generateDailyExercises(userId);
+
+      // Buscar os exercícios recém-gerados
+      const newExercises = await this.personalizedContentService.getDailyExercises(userId);
+      console.log(`[getUserExercises] ${newExercises.length} exercícios personalizados gerados para usuário ${userId}`);
+      return newExercises;
+    }
+
+    console.log(`[getUserExercises] Retornando ${personalizedExercises.length} exercícios personalizados para usuário ${userId}`);
+    return personalizedExercises;
   }
 
   async getUserSavedTips(userId: number) {
     console.log(`[getUserSavedTips] Buscando dicas salvas para usuário ${userId}`);
 
-    // Buscar atividades do usuário que são relacionadas a salvar dicas
-    const savedTipActivities = await this.prisma.preventionActivity.findMany({
-      where: {
-        userId,
-        OR: [
-          { description: { contains: 'Dica salva:' } },
-          { description: { contains: 'save_tip' } }
-        ]
-      },
-      orderBy: {
-        completedAt: 'desc'
-      }
-    });
+    // Usar o novo sistema de dicas salvas
+    return this.personalizedContentService.getSavedTips(userId);
+  }
 
-    console.log(`[getUserSavedTips] Encontradas ${savedTipActivities.length} atividades de dicas salvas`);
+  async saveTip(userId: number, tipId: number, tipType: 'general' | 'personal') {
+    console.log(`[saveTip] Salvando dica ${tipId} (${tipType}) para usuário ${userId}`);
+    return this.personalizedContentService.saveTip(userId, tipId, tipType);
+  }
 
-    // Extrair IDs das dicas das descrições
-    const savedTipIds = savedTipActivities
-      .map(activity => {
-        // Tentar extrair ID da descrição "Dica salva: Dica #X"
-        const match = activity.description.match(/Dica #(\d+)/);
-        if (match) {
-          const id = parseInt(match[1]);
-          console.log(`[getUserSavedTips] Extraído ID ${id} da descrição: ${activity.description}`);
-          return id;
-        }
-        return null;
-      })
-      .filter((id): id is number => id !== null && !isNaN(id));
-
-    // Remover duplicatas
-    const uniqueSavedTipIds = [...new Set(savedTipIds)];
-
-    console.log(`[getUserSavedTips] IDs únicos de dicas salvas: [${uniqueSavedTipIds.join(', ')}]`);
-
-    return {
-      savedTipIds: uniqueSavedTipIds,
-      totalSaved: uniqueSavedTipIds.length,
-      activities: savedTipActivities.map(activity => ({
-        id: activity.id,
-        description: activity.description,
-        completedAt: activity.completedAt
-      }))
-    };
+  async unsaveTip(userId: number, tipId: number, tipType: 'general' | 'personal') {
+    console.log(`[unsaveTip] Removendo dica ${tipId} (${tipType}) dos salvos do usuário ${userId}`);
+    return this.personalizedContentService.unsaveTip(userId, tipId, tipType);
   }
 
   async trackPreventionActivity(userId: number, activityDto: CreatePreventionActivityDto): Promise<PreventionActivityDto> {
