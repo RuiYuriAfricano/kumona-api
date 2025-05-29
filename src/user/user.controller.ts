@@ -44,6 +44,7 @@ export class UserController {
       notificationsEnabled: profile.preferences?.notificationsEnabled ?? true,
       emailNotifications: false, // Adicionar ao modelo se necessário
       language: profile.preferences?.language ?? 'pt',
+      theme: profile.preferences?.theme ?? 'light',
       fontSize: 'Médio', // Adicionar ao modelo se necessário
       dataUsage: 'Automático', // Adicionar ao modelo se necessário
       reminderFrequency: profile.preferences?.reminderFrequency ?? 'daily'
@@ -66,6 +67,9 @@ export class UserController {
     }
     if (settingsData.language !== undefined) {
       preferences.language = settingsData.language;
+    }
+    if (settingsData.theme !== undefined) {
+      preferences.theme = settingsData.theme;
     }
     if (settingsData.reminderFrequency !== undefined) {
       preferences.reminderFrequency = settingsData.reminderFrequency;

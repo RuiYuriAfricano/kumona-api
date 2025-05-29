@@ -44,6 +44,7 @@ model UserPreferences {
   notificationsEnabled Boolean  @default(true)
   reminderFrequency    String   @default("daily")
   language             String   @default("pt")
+  theme                String   @default("light") // light, dark
   userId               Int      @unique
   user                 User     @relation(fields: [userId], references: [id])
   createdAt            DateTime @default(now())
@@ -80,7 +81,10 @@ model PreventionTip {
   title       String
   description String
   category    String
+  display     Boolean  @default(true) // Controls daily display
   createdAt   DateTime @default(now())
+
+  @@index([display])
 }
 
 model EyeExercise {

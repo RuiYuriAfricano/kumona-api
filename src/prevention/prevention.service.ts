@@ -10,7 +10,17 @@ import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 export class PreventionService {
   constructor(private prisma: PrismaService) {}
 
-  async getPreventionTips(category?: string, limit = 10): Promise<PreventionTipDto[]> {
+  async getPreventionTips(userId: number, category?: string, limit = 10): Promise<PreventionTipDto[]> {
+    // Para novos usuários, sempre retornar array vazio
+    // Só mostrar dicas após o usuário fazer pelo menos um diagnóstico
+    const userDiagnoses = await this.prisma.diagnosis.count({
+      where: { userId }
+    });
+
+    if (userDiagnoses === 0) {
+      return [];
+    }
+
     const where = category ? { category } : {};
 
     return this.prisma.preventionTip.findMany({
@@ -22,12 +32,167 @@ export class PreventionService {
     });
   }
 
-  async getEyeExercises(): Promise<EyeExerciseDto[]> {
+  async getEyeExercises(userId: number): Promise<EyeExerciseDto[]> {
+    // Para novos usuários, sempre retornar array vazio
+    // Só mostrar exercícios após o usuário fazer pelo menos um diagnóstico
+    const userDiagnoses = await this.prisma.diagnosis.count({
+      where: { userId }
+    });
+
+    if (userDiagnoses === 0) {
+      return [];
+    }
+
     return this.prisma.eyeExercise.findMany({
       orderBy: {
         createdAt: 'desc',
       },
     });
+  }
+
+  async getPreventionTipById(id: number): Promise<PreventionTipDto> {
+    const tip = await this.prisma.preventionTip.findUnique({
+      where: { id },
+    });
+
+    if (!tip) {
+      throw new Error('Dica de prevenção não encontrada');
+    }
+
+    return tip;
+  }
+
+  async getEyeExerciseById(id: number): Promise<EyeExerciseDto> {
+    const exercise = await this.prisma.eyeExercise.findUnique({
+      where: { id },
+    });
+
+    if (!exercise) {
+      throw new Error('Exercício não encontrado');
+    }
+
+    return exercise;
+  }
+
+  async debugUserStatus(userId: number) {
+    const userDiagnoses = await this.prisma.diagnosis.count({
+      where: { userId }
+    });
+
+    const userActivities = await this.prisma.preventionActivity.count({
+      where: { userId }
+    });
+
+    const totalTips = await this.prisma.preventionTip.count();
+    const totalExercises = await this.prisma.eyeExercise.count();
+
+    return {
+      userId,
+      diagnosesCount: userDiagnoses,
+      activitiesCount: userActivities,
+      totalTipsInDatabase: totalTips,
+      totalExercisesInDatabase: totalExercises,
+      shouldShowTips: userDiagnoses > 0,
+      shouldShowExercises: userDiagnoses > 0
+    };
+  }
+
+  async getUserPreventionTips(userId: number): Promise<PreventionTipDto[]> {
+    // Verificar se o usuário tem diagnósticos
+    const userDiagnoses = await this.prisma.diagnosis.count({
+      where: { userId }
+    });
+
+    console.log(`[getUserPreventionTips] UserId: ${userId}, Diagnoses: ${userDiagnoses}`);
+
+    if (userDiagnoses === 0) {
+      console.log(`[getUserPreventionTips] Usuário ${userId} não tem diagnósticos - retornando array vazio`);
+      return [];
+    }
+
+    const tips = await this.prisma.preventionTip.findMany({
+      where: {
+        display: true // Só mostrar dicas marcadas para exibição
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    console.log(`[getUserPreventionTips] Retornando ${tips.length} dicas para usuário ${userId}`);
+    return tips;
+  }
+
+  async getUserExercises(userId: number): Promise<EyeExerciseDto[]> {
+    // Verificar se o usuário tem diagnósticos
+    const userDiagnoses = await this.prisma.diagnosis.count({
+      where: { userId }
+    });
+
+    console.log(`[getUserExercises] UserId: ${userId}, Diagnoses: ${userDiagnoses}`);
+
+    if (userDiagnoses === 0) {
+      console.log(`[getUserExercises] Usuário ${userId} não tem diagnósticos - retornando array vazio`);
+      return [];
+    }
+
+    const exercises = await this.prisma.eyeExercise.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    console.log(`[getUserExercises] Retornando ${exercises.length} exercícios para usuário ${userId}`);
+    return exercises;
+  }
+
+  async getUserSavedTips(userId: number) {
+    console.log(`[getUserSavedTips] Buscando dicas salvas para usuário ${userId}`);
+
+    // Buscar atividades do usuário que são relacionadas a salvar dicas
+    const savedTipActivities = await this.prisma.preventionActivity.findMany({
+      where: {
+        userId,
+        OR: [
+          { description: { contains: 'Dica salva:' } },
+          { description: { contains: 'save_tip' } }
+        ]
+      },
+      orderBy: {
+        completedAt: 'desc'
+      }
+    });
+
+    console.log(`[getUserSavedTips] Encontradas ${savedTipActivities.length} atividades de dicas salvas`);
+
+    // Extrair IDs das dicas das descrições
+    const savedTipIds = savedTipActivities
+      .map(activity => {
+        // Tentar extrair ID da descrição "Dica salva: Dica #X"
+        const match = activity.description.match(/Dica #(\d+)/);
+        if (match) {
+          const id = parseInt(match[1]);
+          console.log(`[getUserSavedTips] Extraído ID ${id} da descrição: ${activity.description}`);
+          return id;
+        }
+        return null;
+      })
+      .filter((id): id is number => id !== null && !isNaN(id));
+
+    // Remover duplicatas
+    const uniqueSavedTipIds = [...new Set(savedTipIds)];
+
+    console.log(`[getUserSavedTips] IDs únicos de dicas salvas: [${uniqueSavedTipIds.join(', ')}]`);
+
+    return {
+      savedTipIds: uniqueSavedTipIds,
+      totalSaved: uniqueSavedTipIds.length,
+      activities: savedTipActivities.map(activity => ({
+        id: activity.id,
+        description: activity.description,
+        completedAt: activity.completedAt
+      }))
+    };
   }
 
   async trackPreventionActivity(userId: number, activityDto: CreatePreventionActivityDto): Promise<PreventionActivityDto> {

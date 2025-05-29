@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Query,
+  Param,
   UseGuards,
   Request,
   ParseIntPipe,
@@ -46,12 +47,13 @@ export class PreventionController {
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async getPreventionTips(
+    @Request() req,
     @Query('category') category?: string,
     @Query('limit') limitStr?: string,
   ): Promise<PreventionTipDto[]> {
     // Converter limit para number se fornecido
     const limit = limitStr ? parseInt(limitStr, 10) : undefined;
-    return this.preventionService.getPreventionTips(category, limit);
+    return this.preventionService.getPreventionTips(req.user.id, category, limit);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -66,8 +68,28 @@ export class PreventionController {
     type: [EyeExerciseDto]
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async getEyeExercises(): Promise<EyeExerciseDto[]> {
-    return this.preventionService.getEyeExercises();
+  async getEyeExercises(@Request() req): Promise<EyeExerciseDto[]> {
+    return this.preventionService.getEyeExercises(req.user.id);
+  }
+
+  @Get('tips/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Buscar dica de prevenção por ID' })
+  @ApiResponse({ status: 200, description: 'Dica encontrada', type: PreventionTipDto })
+  @ApiResponse({ status: 404, description: 'Dica não encontrada' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getPreventionTipById(@Param('id') id: string): Promise<PreventionTipDto> {
+    return this.preventionService.getPreventionTipById(parseInt(id, 10));
+  }
+
+  @Get('exercises/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Buscar exercício por ID' })
+  @ApiResponse({ status: 200, description: 'Exercício encontrado', type: EyeExerciseDto })
+  @ApiResponse({ status: 404, description: 'Exercício não encontrado' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getEyeExerciseById(@Param('id') id: string): Promise<EyeExerciseDto> {
+    return this.preventionService.getEyeExerciseById(parseInt(id, 10));
   }
 
   @UseGuards(JwtAuthGuard)
@@ -143,5 +165,42 @@ export class PreventionController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   async getUserActivities(@Request() req) {
     return this.preventionService.getUserActivities(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('debug/user-status')
+  @ApiOperation({
+    summary: 'Debug: Verificar status do usuário',
+    description: 'Endpoint temporário para verificar quantos diagnósticos o usuário tem'
+  })
+  async debugUserStatus(@Request() req) {
+    return this.preventionService.debugUserStatus(req.user.id);
+  }
+
+  @Get('user/tips')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Buscar dicas de prevenção do usuário' })
+  @ApiResponse({ status: 200, description: 'Dicas do usuário encontradas', type: [PreventionTipDto] })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getUserPreventionTips(@Request() req): Promise<PreventionTipDto[]> {
+    return this.preventionService.getUserPreventionTips(req.user.id);
+  }
+
+  @Get('user/exercises')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Buscar exercícios do usuário' })
+  @ApiResponse({ status: 200, description: 'Exercícios do usuário encontrados', type: [EyeExerciseDto] })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getUserExercises(@Request() req): Promise<EyeExerciseDto[]> {
+    return this.preventionService.getUserExercises(req.user.id);
+  }
+
+  @Get('user/saved-tips')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Buscar dicas salvas do usuário' })
+  @ApiResponse({ status: 200, description: 'Dicas salvas do usuário encontradas' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getUserSavedTips(@Request() req) {
+    return this.preventionService.getUserSavedTips(req.user.id);
   }
 }
