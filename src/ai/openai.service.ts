@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
 interface UserProfile {
@@ -39,15 +38,16 @@ export class OpenAIService {
   private openai: OpenAI;
   private readonly isEnabled: boolean;
 
-  constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+  constructor() {
+    // Usar API key diretamente no código para testes
+    const apiKey = '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';
     this.isEnabled = !!apiKey;
 
     if (this.isEnabled) {
       this.openai = new OpenAI({
         apiKey: apiKey,
       });
-      this.logger.log('✅ OpenAI service initialized successfully');
+      this.logger.log('✅ OpenAI service initialized successfully with hardcoded API key');
     } else {
       this.logger.warn('⚠️ OpenAI API key not found. AI features will use fallback logic.');
     }
@@ -153,8 +153,8 @@ export class OpenAIService {
     const conditions = userProfile.medicalHistory?.existingConditions?.join(', ') || 'Nenhuma condição reportada';
     const familyHistory = userProfile.medicalHistory?.familyHistory?.join(', ') || 'Sem histórico familiar conhecido';
     const medications = userProfile.medicalHistory?.medications?.join(', ') || 'Nenhuma medicação atual';
-    
-    const recentDiagnoses = userProfile.diagnoses?.slice(0, 3).map(d => 
+
+    const recentDiagnoses = userProfile.diagnoses?.slice(0, 3).map(d =>
       `${d.condition} (${d.severity}, score: ${d.score})`
     ).join(', ') || 'Nenhum diagnóstico recente';
 
@@ -197,7 +197,7 @@ Categorias possíveis: "digital_health", "nutrition", "exercise", "prevention", 
    */
   private buildExercisesPrompt(userProfile: UserProfile, age: number, count: number): string {
     const conditions = userProfile.medicalHistory?.existingConditions?.join(', ') || 'Nenhuma condição reportada';
-    const recentDiagnoses = userProfile.diagnoses?.slice(0, 3).map(d => 
+    const recentDiagnoses = userProfile.diagnoses?.slice(0, 3).map(d =>
       `${d.condition} (${d.severity})`
     ).join(', ') || 'Nenhum diagnóstico recente';
 
@@ -243,11 +243,11 @@ Categorias possíveis: "relaxation", "strengthening", "coordination", "focus_tra
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     return age;
   }
 
@@ -263,7 +263,7 @@ Categorias possíveis: "relaxation", "strengthening", "coordination", "focus_tra
     }
 
     try {
-      const response = await this.openai.chat.completions.create({
+      await this.openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: 'Test connection' }],
         max_tokens: 10
