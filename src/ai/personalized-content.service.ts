@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OpenAIService } from './openai.service';
 
 interface UserProfile {
   id: number;
@@ -36,7 +37,10 @@ interface GeneratedExercise {
 export class PersonalizedContentService {
   private readonly logger = new Logger(PersonalizedContentService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private openaiService: OpenAIService
+  ) {}
 
   /**
    * Gera e salva dicas personalizadas diárias para um usuário
@@ -242,15 +246,38 @@ export class PersonalizedContentService {
   }
 
   /**
-   * Gera dicas usando IA baseado no perfil do usuário
+   * Gera dicas usando IA real ou fallback baseado no perfil do usuário
    */
   private async generateTipsWithAI(userProfile: UserProfile, count: number): Promise<GeneratedTip[]> {
+    // Tentar usar OpenAI primeiro
+    if (this.openaiService.isAvailable()) {
+      try {
+        this.logger.log(`🤖 [PersonalizedContent] Usando OpenAI para gerar dicas para usuário ${userProfile.id}`);
+        const aiTips = await this.openaiService.generatePersonalizedTips(userProfile, count);
+        this.logger.log(`✅ [PersonalizedContent] OpenAI gerou ${aiTips.length} dicas com sucesso`);
+        return aiTips;
+      } catch (error) {
+        this.logger.error(`❌ [PersonalizedContent] Erro ao usar OpenAI, usando fallback:`, error);
+        // Continuar para fallback
+      }
+    } else {
+      this.logger.log(`⚠️ [PersonalizedContent] OpenAI não disponível, usando lógica de fallback`);
+    }
+
+    // Fallback: usar lógica baseada em regras
+    return this.generateTipsWithFallback(userProfile, count);
+  }
+
+  /**
+   * Gera dicas usando lógica de fallback (regras)
+   */
+  private async generateTipsWithFallback(userProfile: UserProfile, count: number): Promise<GeneratedTip[]> {
     const age = this.calculateAge(userProfile.birthDate);
     const hasConditions = userProfile.medicalHistory?.existingConditions?.length > 0;
     const recentDiagnoses = userProfile.diagnoses?.slice(0, 3) || [];
-    
+
     const tips: GeneratedTip[] = [];
-    
+
     // Dicas baseadas na idade
     if (age < 30) {
       tips.push({
@@ -286,9 +313,32 @@ export class PersonalizedContentService {
   }
 
   /**
-   * Gera exercícios usando IA baseado no perfil do usuário
+   * Gera exercícios usando IA real ou fallback baseado no perfil do usuário
    */
   private async generateExercisesWithAI(userProfile: UserProfile, count: number): Promise<GeneratedExercise[]> {
+    // Tentar usar OpenAI primeiro
+    if (this.openaiService.isAvailable()) {
+      try {
+        this.logger.log(`🤖 [PersonalizedContent] Usando OpenAI para gerar exercícios para usuário ${userProfile.id}`);
+        const aiExercises = await this.openaiService.generatePersonalizedExercises(userProfile, count);
+        this.logger.log(`✅ [PersonalizedContent] OpenAI gerou ${aiExercises.length} exercícios com sucesso`);
+        return aiExercises;
+      } catch (error) {
+        this.logger.error(`❌ [PersonalizedContent] Erro ao usar OpenAI para exercícios, usando fallback:`, error);
+        // Continuar para fallback
+      }
+    } else {
+      this.logger.log(`⚠️ [PersonalizedContent] OpenAI não disponível para exercícios, usando lógica de fallback`);
+    }
+
+    // Fallback: usar lógica baseada em regras
+    return this.generateExercisesWithFallback(userProfile, count);
+  }
+
+  /**
+   * Gera exercícios usando lógica de fallback (regras)
+   */
+  private async generateExercisesWithFallback(userProfile: UserProfile, count: number): Promise<GeneratedExercise[]> {
     const age = this.calculateAge(userProfile.birthDate);
     const exercises: GeneratedExercise[] = [];
 
@@ -339,11 +389,11 @@ export class PersonalizedContentService {
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     return age;
   }
 
