@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
 export interface UserProfile {
@@ -38,11 +39,9 @@ export class OpenAIService {
   private openai: OpenAI;
   private readonly isEnabled: boolean;
 
-  constructor() {
-    // Usar API key diretamente no código para testes
-    // Concatenar partes para evitar detecção do GitHub
-    const part1 = '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';
-    const apiKey = part1;
+  constructor(private configService: ConfigService) {
+    // Usar API key do arquivo .env
+    const apiKey = this.configService.get<string>('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') || '';
     this.isEnabled = !!apiKey;
 
     if (this.isEnabled) {
@@ -77,11 +76,11 @@ export class OpenAIService {
       const prompt = this.buildTipsPrompt(userProfile, age, count);
 
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em saúde ocular e oftalmologia. Gere dicas personalizadas, práticas e baseadas em evidências científicas. Sempre use linguagem acessível e amigável.'
+            content: 'Você é um especialista em saúde ocular e oftalmologia. Gere dicas personalizadas, práticas e baseadas em evidências científicas. Sempre use linguagem acessível e amigável. Responda sempre em formato JSON válido.'
           },
           {
             role: 'user',
@@ -89,8 +88,7 @@ export class OpenAIService {
           }
         ],
         max_tokens: 2000,
-        temperature: 0.7,
-        response_format: { type: 'json_object' }
+        temperature: 0.7
       });
 
       const content = response.choices[0].message.content;
@@ -120,11 +118,11 @@ export class OpenAIService {
       const prompt = this.buildExercisesPrompt(userProfile, age, count);
 
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
-            content: 'Você é um fisioterapeuta especializado em exercícios oculares e um oftalmologista experiente. Crie exercícios seguros, eficazes e personalizados para saúde ocular.'
+            content: 'Você é um fisioterapeuta especializado em exercícios oculares e um oftalmologista experiente. Crie exercícios seguros, eficazes e personalizados para saúde ocular. Responda sempre em formato JSON válido.'
           },
           {
             role: 'user',
@@ -132,8 +130,7 @@ export class OpenAIService {
           }
         ],
         max_tokens: 1500,
-        temperature: 0.6,
-        response_format: { type: 'json_object' }
+        temperature: 0.6
       });
 
       const content = response.choices[0].message.content;

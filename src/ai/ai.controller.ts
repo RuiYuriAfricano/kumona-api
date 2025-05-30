@@ -1,9 +1,10 @@
-import { Controller, Post, Get, UseGuards, Request, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Delete, UseGuards, Request, Param, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DailyContentService } from './daily-content.service';
 import { PersonalizedContentService } from './personalized-content.service';
 import { OpenAIService, UserProfile } from './openai.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('ai')
 @ApiBearerAuth()
@@ -12,7 +13,8 @@ export class AiController {
   constructor(
     private dailyContentService: DailyContentService,
     private personalizedContentService: PersonalizedContentService,
-    private openaiService: OpenAIService
+    private openaiService: OpenAIService,
+    private prisma: PrismaService
   ) {}
 
   @Post('generate-daily-content')
@@ -241,7 +243,7 @@ export class AiController {
         const aiTips = await this.openaiService.generatePersonalizedTips(sampleUserProfile, 5);
         return {
           success: true,
-          method: 'OpenAI GPT-4',
+          method: 'OpenAI GPT-3.5-turbo',
           userProfile: {
             name: sampleUserProfile.name,
             age: new Date().getFullYear() - sampleUserProfile.birthDate.getFullYear(),
@@ -300,7 +302,7 @@ export class AiController {
         const aiExercises = await this.openaiService.generatePersonalizedExercises(sampleUserProfile, 3);
         return {
           success: true,
-          method: 'OpenAI GPT-4',
+          method: 'OpenAI GPT-3.5-turbo',
           userProfile: {
             name: sampleUserProfile.name,
             age: new Date().getFullYear() - sampleUserProfile.birthDate.getFullYear(),
@@ -318,6 +320,467 @@ export class AiController {
           timestamp: new Date().toISOString()
         };
       }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Post('test/seed-ai-content')
+  @ApiOperation({
+    summary: '[TESTE] Gerar conteúdo IA para todos os usuários (seed)',
+    description: 'Endpoint para popular o banco com conteúdo gerado por IA para todos os usuários com diagnósticos'
+  })
+  @ApiResponse({ status: 200, description: 'Conteúdo gerado para todos os usuários' })
+  async seedAIContent(): Promise<any> {
+    try {
+      const result = await this.dailyContentService.generateDailyContentForAllUsers();
+
+      // Obter estatísticas após a geração
+      const stats = await this.dailyContentService.getContentStats();
+
+      return {
+        success: true,
+        message: 'Conteúdo IA gerado para todos os usuários com diagnósticos',
+        stats,
+        timestamp: new Date().toISOString(),
+        note: 'Este endpoint popula o banco com dicas e exercícios personalizados'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Post('test/seed-user-content/:userId')
+  @ApiOperation({
+    summary: '[TESTE] Gerar conteúdo IA para usuário específico',
+    description: 'Endpoint para gerar conteúdo personalizado para um usuário específico'
+  })
+  @ApiResponse({ status: 200, description: 'Conteúdo gerado para o usuário' })
+  async seedUserContent(@Param('userId', ParseIntPipe) userId: number): Promise<any> {
+    try {
+      // Gerar conteúdo para o usuário específico
+      const result = await this.dailyContentService.generateContentManually(userId);
+
+      if (result.success) {
+        // Buscar o conteúdo gerado
+        const [tips, exercises] = await Promise.all([
+          this.personalizedContentService.getDailyTips(userId),
+          this.personalizedContentService.getDailyExercises(userId)
+        ]);
+
+        return {
+          success: true,
+          message: `Conteúdo IA gerado para usuário ${userId}`,
+          userId,
+          content: {
+            tips: tips.length,
+            exercises: exercises.length,
+            generatedTips: tips,
+            generatedExercises: exercises
+          },
+          timestamp: new Date().toISOString()
+        };
+      } else {
+        return result;
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        userId,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Get('test/user-content/:userId')
+  @ApiOperation({
+    summary: '[TESTE] Ver conteúdo IA do usuário',
+    description: 'Endpoint para visualizar o conteúdo personalizado de um usuário'
+  })
+  @ApiResponse({ status: 200, description: 'Conteúdo do usuário retornado' })
+  async getUserContent(@Param('userId', ParseIntPipe) userId: number): Promise<any> {
+    try {
+      const [tips, exercises, savedTips] = await Promise.all([
+        this.personalizedContentService.getDailyTips(userId),
+        this.personalizedContentService.getDailyExercises(userId),
+        this.personalizedContentService.getSavedTips(userId)
+      ]);
+
+      return {
+        success: true,
+        userId,
+        content: {
+          dailyTips: {
+            count: tips.length,
+            tips: tips
+          },
+          dailyExercises: {
+            count: exercises.length,
+            exercises: exercises
+          },
+          savedTips: {
+            count: savedTips.totalSaved,
+            savedTipIds: savedTips.savedTipIds
+          }
+        },
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        userId,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Delete('test/clear-ai-content')
+  @ApiOperation({
+    summary: '[TESTE] Limpar todo conteúdo IA',
+    description: 'Endpoint para limpar todo o conteúdo gerado por IA (reset)'
+  })
+  @ApiResponse({ status: 200, description: 'Conteúdo IA limpo' })
+  async clearAIContent(): Promise<any> {
+    try {
+      // Usar o serviço do Prisma diretamente para limpar
+      const [deletedTips, deletedExercises, deletedSavedTips] = await Promise.all([
+        this.personalizedContentService['prisma'].userTip.deleteMany({}),
+        this.personalizedContentService['prisma'].userExercise.deleteMany({}),
+        this.personalizedContentService['prisma'].savedTip.deleteMany({})
+      ]);
+
+      return {
+        success: true,
+        message: 'Todo conteúdo IA foi limpo do banco de dados',
+        deleted: {
+          tips: deletedTips.count,
+          exercises: deletedExercises.count,
+          savedTips: deletedSavedTips.count
+        },
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Get('test/demo-users')
+  @ApiOperation({
+    summary: '[TESTE] Listar usuários de demonstração',
+    description: 'Retorna lista de usuários estáticos para teste da IA'
+  })
+  @ApiResponse({ status: 200, description: 'Lista de usuários de demonstração' })
+  async getDemoUsers(): Promise<any> {
+    const demoUsers = [
+      {
+        id: 1001,
+        name: 'João Silva',
+        age: 34,
+        birthDate: new Date('1990-05-15'),
+        email: 'joao.silva@demo.com',
+        medicalHistory: {
+          existingConditions: ['Miopia leve', 'Astigmatismo'],
+          familyHistory: ['Glaucoma (avô paterno)', 'Catarata (avó materna)'],
+          medications: ['Colírio lubrificante']
+        },
+        diagnoses: [
+          {
+            condition: 'Fadiga ocular digital',
+            severity: 'medium',
+            score: 65,
+            createdAt: new Date('2024-05-20')
+          },
+          {
+            condition: 'Olho seco leve',
+            severity: 'low',
+            score: 35,
+            createdAt: new Date('2024-05-10')
+          }
+        ]
+      },
+      {
+        id: 1002,
+        name: 'Maria Santos',
+        age: 28,
+        birthDate: new Date('1996-08-20'),
+        email: 'maria.santos@demo.com',
+        medicalHistory: {
+          existingConditions: ['Síndrome do olho seco'],
+          familyHistory: [],
+          medications: ['Lágrimas artificiais', 'Ômega 3']
+        },
+        diagnoses: [
+          {
+            condition: 'Síndrome do olho seco moderada',
+            severity: 'medium',
+            score: 55,
+            createdAt: new Date('2024-05-25')
+          }
+        ]
+      },
+      {
+        id: 1003,
+        name: 'Carlos Mendes',
+        age: 45,
+        birthDate: new Date('1979-12-03'),
+        email: 'carlos.mendes@demo.com',
+        medicalHistory: {
+          existingConditions: ['Hipertensão', 'Diabetes tipo 2'],
+          familyHistory: ['Retinopatia diabética (pai)', 'Glaucoma (mãe)'],
+          medications: ['Metformina', 'Losartana', 'Colírio anti-glaucoma']
+        },
+        diagnoses: [
+          {
+            condition: 'Retinopatia diabética inicial',
+            severity: 'high',
+            score: 78,
+            createdAt: new Date('2024-05-15')
+          },
+          {
+            condition: 'Pressão intraocular elevada',
+            severity: 'medium',
+            score: 62,
+            createdAt: new Date('2024-05-18')
+          }
+        ]
+      },
+      {
+        id: 1004,
+        name: 'Ana Costa',
+        age: 22,
+        birthDate: new Date('2002-03-10'),
+        email: 'ana.costa@demo.com',
+        medicalHistory: {
+          existingConditions: [],
+          familyHistory: ['Miopia (ambos os pais)'],
+          medications: []
+        },
+        diagnoses: [
+          {
+            condition: 'Miopia progressiva',
+            severity: 'low',
+            score: 42,
+            createdAt: new Date('2024-05-22')
+          }
+        ]
+      }
+    ];
+
+    return {
+      success: true,
+      message: 'Usuários de demonstração para teste da IA',
+      users: demoUsers,
+      count: demoUsers.length,
+      timestamp: new Date().toISOString(),
+      note: 'Estes são usuários estáticos criados para demonstrar a personalização da IA'
+    };
+  }
+
+  @Post('test/generate-for-demo-user/:demoUserId')
+  @ApiOperation({
+    summary: '[TESTE] Gerar conteúdo IA para usuário de demonstração',
+    description: 'Gera dicas e exercícios personalizados para um usuário de demonstração específico'
+  })
+  @ApiResponse({ status: 200, description: 'Conteúdo gerado para usuário de demonstração' })
+  async generateForDemoUser(@Param('demoUserId', ParseIntPipe) demoUserId: number): Promise<any> {
+    try {
+      // Definir usuários de demonstração
+      const demoUsers = {
+        1001: {
+          id: 1001,
+          name: 'João Silva',
+          birthDate: new Date('1990-05-15'),
+          medicalHistory: {
+            existingConditions: ['Miopia leve', 'Astigmatismo'],
+            familyHistory: ['Glaucoma (avô paterno)', 'Catarata (avó materna)'],
+            medications: ['Colírio lubrificante']
+          },
+          diagnoses: [
+            {
+              condition: 'Fadiga ocular digital',
+              severity: 'medium',
+              score: 65,
+              createdAt: new Date('2024-05-20')
+            }
+          ]
+        },
+        1002: {
+          id: 1002,
+          name: 'Maria Santos',
+          birthDate: new Date('1996-08-20'),
+          medicalHistory: {
+            existingConditions: ['Síndrome do olho seco'],
+            familyHistory: [],
+            medications: ['Lágrimas artificiais', 'Ômega 3']
+          },
+          diagnoses: [
+            {
+              condition: 'Síndrome do olho seco moderada',
+              severity: 'medium',
+              score: 55,
+              createdAt: new Date('2024-05-25')
+            }
+          ]
+        },
+        1003: {
+          id: 1003,
+          name: 'Carlos Mendes',
+          birthDate: new Date('1979-12-03'),
+          medicalHistory: {
+            existingConditions: ['Hipertensão', 'Diabetes tipo 2'],
+            familyHistory: ['Retinopatia diabética (pai)', 'Glaucoma (mãe)'],
+            medications: ['Metformina', 'Losartana', 'Colírio anti-glaucoma']
+          },
+          diagnoses: [
+            {
+              condition: 'Retinopatia diabética inicial',
+              severity: 'high',
+              score: 78,
+              createdAt: new Date('2024-05-15')
+            }
+          ]
+        },
+        1004: {
+          id: 1004,
+          name: 'Ana Costa',
+          birthDate: new Date('2002-03-10'),
+          medicalHistory: {
+            existingConditions: [],
+            familyHistory: ['Miopia (ambos os pais)'],
+            medications: []
+          },
+          diagnoses: [
+            {
+              condition: 'Miopia progressiva',
+              severity: 'low',
+              score: 42,
+              createdAt: new Date('2024-05-22')
+            }
+          ]
+        }
+      };
+
+      const demoUser = demoUsers[demoUserId];
+      if (!demoUser) {
+        return {
+          success: false,
+          error: `Usuário de demonstração ${demoUserId} não encontrado`,
+          availableUsers: Object.keys(demoUsers).map(Number),
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Gerar dicas e exercícios usando IA
+      const [aiTips, aiExercises] = await Promise.all([
+        this.openaiService.isAvailable()
+          ? this.openaiService.generatePersonalizedTips(demoUser, 10)
+          : [],
+        this.openaiService.isAvailable()
+          ? this.openaiService.generatePersonalizedExercises(demoUser, 3)
+          : []
+      ]);
+
+      const age = new Date().getFullYear() - demoUser.birthDate.getFullYear();
+
+      return {
+        success: true,
+        message: `Conteúdo IA gerado para ${demoUser.name}`,
+        demoUser: {
+          id: demoUser.id,
+          name: demoUser.name,
+          age,
+          conditions: demoUser.medicalHistory.existingConditions,
+          familyHistory: demoUser.medicalHistory.familyHistory,
+          medications: demoUser.medicalHistory.medications,
+          recentDiagnosis: demoUser.diagnoses[0]?.condition
+        },
+        generatedContent: {
+          tips: {
+            count: aiTips.length,
+            method: this.openaiService.isAvailable() ? 'OpenAI GPT-3.5-turbo' : 'Fallback',
+            content: aiTips
+          },
+          exercises: {
+            count: aiExercises.length,
+            method: this.openaiService.isAvailable() ? 'OpenAI GPT-3.5-turbo' : 'Fallback',
+            content: aiExercises
+          }
+        },
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        demoUserId,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Post('test/generate-all-demo-users')
+  @ApiOperation({
+    summary: '[TESTE] Gerar conteúdo IA para todos os usuários de demonstração',
+    description: 'Gera dicas e exercícios personalizados para todos os usuários de demonstração'
+  })
+  @ApiResponse({ status: 200, description: 'Conteúdo gerado para todos os usuários de demonstração' })
+  async generateForAllDemoUsers(): Promise<any> {
+    try {
+      const demoUserIds = [1001, 1002, 1003, 1004];
+      const results = [];
+
+      for (const userId of demoUserIds) {
+        try {
+          const result = await this.generateForDemoUser(userId);
+          results.push({
+            userId,
+            success: result.success,
+            userName: result.demoUser?.name || 'Unknown',
+            tipsGenerated: result.generatedContent?.tips?.count || 0,
+            exercisesGenerated: result.generatedContent?.exercises?.count || 0,
+            error: result.error || null
+          });
+        } catch (error) {
+          results.push({
+            userId,
+            success: false,
+            error: error.message
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const totalTips = results.reduce((sum, r) => sum + (r.tipsGenerated || 0), 0);
+      const totalExercises = results.reduce((sum, r) => sum + (r.exercisesGenerated || 0), 0);
+
+      return {
+        success: true,
+        message: `Conteúdo IA gerado para ${successCount}/${demoUserIds.length} usuários de demonstração`,
+        summary: {
+          usersProcessed: demoUserIds.length,
+          usersSuccess: successCount,
+          totalTipsGenerated: totalTips,
+          totalExercisesGenerated: totalExercises
+        },
+        results,
+        timestamp: new Date().toISOString()
+      };
+
     } catch (error) {
       return {
         success: false,
