@@ -41,14 +41,14 @@ export class OpenAIService {
 
   constructor(private configService: ConfigService) {
     // Usar API key do arquivo .env
-    const apiKey = this.configService.get<string>('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') || '';
+    const apiKey = this.configService.get<string>('OPENAI_API_KEY') || '';
     this.isEnabled = !!apiKey;
 
     if (this.isEnabled) {
       this.openai = new OpenAI({
         apiKey: apiKey,
       });
-      this.logger.log('✅ OpenAI service initialized successfully with hardcoded API key');
+      this.logger.log('✅ OpenAI service initialized successfully');
     } else {
       this.logger.warn('⚠️ OpenAI API key not found. AI features will use fallback logic.');
     }

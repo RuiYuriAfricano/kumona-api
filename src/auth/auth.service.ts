@@ -410,8 +410,8 @@ export class AuthService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: '182853359858-2i3blnvc8ob4fsscoaa27top339a1rrd.apps.googleusercontent.com',
-          client_secret: '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',
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
           code: code,
           grant_type: 'authorization_code',
           redirect_uri: process.env.NODE_ENV === 'production'
