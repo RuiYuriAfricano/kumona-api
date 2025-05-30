@@ -403,6 +403,18 @@ export class AuthService {
 
   async googleCallback(code: string) {
     try {
+      console.log('🔄 Iniciando googleCallback...');
+      console.log('📦 Código recebido:', code?.substring(0, 20) + '...');
+      console.log('🔑 Client ID:', process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + '...');
+      console.log('🔐 Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Configurado' : 'NÃO CONFIGURADO');
+      console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
+
+      const redirectUri = process.env.NODE_ENV === 'production'
+        ? 'https://kumona-vision-care.netlify.app/auth/google/callback'
+        : 'http://localhost:5173/auth/google/callback';
+
+      console.log('🔗 Redirect URI:', redirectUri);
+
       // Trocar código por token de acesso
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -414,17 +426,20 @@ export class AuthService {
           client_secret: process.env.GOOGLE_CLIENT_SECRET,
           code: code,
           grant_type: 'authorization_code',
-          redirect_uri: process.env.NODE_ENV === 'production'
-            ? 'https://kumona-vision-care.netlify.app'
-            : 'http://localhost:5173',
+          redirect_uri: redirectUri,
         }),
       });
 
+      console.log('📡 Status da resposta do Google:', tokenResponse.status, tokenResponse.statusText);
+
       if (!tokenResponse.ok) {
-        throw new BadRequestException('Falha ao trocar código por token');
+        const errorText = await tokenResponse.text();
+        console.error('❌ Erro do Google OAuth:', errorText);
+        throw new BadRequestException(`Falha ao trocar código por token: ${errorText}`);
       }
 
       const tokenData = await tokenResponse.json();
+      console.log('✅ Token recebido do Google:', tokenData.access_token ? 'Sucesso' : 'Falha');
 
       // Obter informações do usuário
       const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {

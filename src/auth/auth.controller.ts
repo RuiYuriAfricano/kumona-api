@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -108,6 +108,15 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Callback processado com sucesso' })
   @ApiResponse({ status: 400, description: 'Código de autorização inválido' })
   async googleCallback(@Body() body: { code: string }) {
+    console.log('🎯 Controller googleCallback chamado');
+    console.log('📦 Body recebido:', body);
+    console.log('🔑 Código:', body?.code?.substring(0, 20) + '...');
+
+    if (!body?.code) {
+      console.error('❌ Código não fornecido no body');
+      throw new BadRequestException('Código de autorização é obrigatório');
+    }
+
     return this.authService.googleCallback(body.code);
   }
 }
