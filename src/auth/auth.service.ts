@@ -400,4 +400,55 @@ export class AuthService {
       token,
     };
   }
+
+  async googleCallback(code: string) {
+    try {
+      // Trocar código por token de acesso
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: '182853359858-2i3blnvc8ob4fsscoaa27top339a1rrd.apps.googleusercontent.com',
+          client_secret: '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',
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: process.env.NODE_ENV === 'production'
+            ? 'https://kumona-vision-care.netlify.app'
+            : 'http://localhost:5173',
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new BadRequestException('Falha ao trocar código por token');
+      }
+
+      const tokenData = await tokenResponse.json();
+
+      // Obter informações do usuário
+      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+
+      if (!userResponse.ok) {
+        throw new BadRequestException('Falha ao obter dados do usuário');
+      }
+
+      const userData = await userResponse.json();
+
+      return {
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        picture: userData.picture || '',
+        accessToken: tokenData.access_token,
+      };
+    } catch (error) {
+      console.error('Erro no callback do Google:', error);
+      throw new BadRequestException('Falha ao processar callback do Google');
+    }
+  }
 }

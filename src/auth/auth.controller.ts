@@ -98,4 +98,16 @@ export class AuthController {
   async googleSignIn(@Body() googleAuthDto: GoogleAuthDto) {
     return this.authService.googleSignIn(googleAuthDto);
   }
+
+  @Post('google/callback')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Callback do Google OAuth',
+    description: 'Processa o código de autorização retornado pelo Google OAuth'
+  })
+  @ApiResponse({ status: 200, description: 'Callback processado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Código de autorização inválido' })
+  async googleCallback(@Body() body: { code: string }) {
+    return this.authService.googleCallback(body.code);
+  }
 }
