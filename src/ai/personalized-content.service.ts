@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpenAIService } from './openai.service';
+import { GeminiService } from './gemini.service';
 
 interface UserProfile {
   id: number;
@@ -39,7 +40,8 @@ export class PersonalizedContentService {
 
   constructor(
     private prisma: PrismaService,
-    private openaiService: OpenAIService
+    private openaiService: OpenAIService,
+    private geminiService: GeminiService
   ) {}
 
   /**
@@ -247,9 +249,27 @@ export class PersonalizedContentService {
 
   /**
    * Gera dicas usando IA real ou fallback baseado no perfil do usuário
+   * Prioridade: Gemini > OpenAI > Fallback
    */
   private async generateTipsWithAI(userProfile: UserProfile, count: number): Promise<GeneratedTip[]> {
-    // Tentar usar OpenAI primeiro
+    // Tentar usar Gemini primeiro (prioridade)
+    if (this.geminiService.isAvailable()) {
+      try {
+        this.logger.log(`🤖 [PersonalizedContent] Usando Gemini para gerar dicas para usuário ${userProfile.id}`);
+        // Converter UserProfile local para UserProfile do Gemini
+        const geminiProfile = this.convertToGeminiProfile(userProfile);
+        const aiTips = await this.geminiService.generatePersonalizedTips(geminiProfile, count);
+        this.logger.log(`✅ [PersonalizedContent] Gemini gerou ${aiTips.length} dicas com sucesso`);
+        return aiTips;
+      } catch (error) {
+        this.logger.error(`❌ [PersonalizedContent] Erro ao usar Gemini, tentando OpenAI:`, error);
+        // Continuar para OpenAI
+      }
+    } else {
+      this.logger.log(`⚠️ [PersonalizedContent] Gemini não disponível, tentando OpenAI`);
+    }
+
+    // Tentar usar OpenAI como segunda opção
     if (this.openaiService.isAvailable()) {
       try {
         this.logger.log(`🤖 [PersonalizedContent] Usando OpenAI para gerar dicas para usuário ${userProfile.id}`);
@@ -314,9 +334,27 @@ export class PersonalizedContentService {
 
   /**
    * Gera exercícios usando IA real ou fallback baseado no perfil do usuário
+   * Prioridade: Gemini > OpenAI > Fallback
    */
   private async generateExercisesWithAI(userProfile: UserProfile, count: number): Promise<GeneratedExercise[]> {
-    // Tentar usar OpenAI primeiro
+    // Tentar usar Gemini primeiro (prioridade)
+    if (this.geminiService.isAvailable()) {
+      try {
+        this.logger.log(`🤖 [PersonalizedContent] Usando Gemini para gerar exercícios para usuário ${userProfile.id}`);
+        // Converter UserProfile local para UserProfile do Gemini
+        const geminiProfile = this.convertToGeminiProfile(userProfile);
+        const aiExercises = await this.geminiService.generatePersonalizedExercises(geminiProfile, count);
+        this.logger.log(`✅ [PersonalizedContent] Gemini gerou ${aiExercises.length} exercícios com sucesso`);
+        return aiExercises;
+      } catch (error) {
+        this.logger.error(`❌ [PersonalizedContent] Erro ao usar Gemini para exercícios, tentando OpenAI:`, error);
+        // Continuar para OpenAI
+      }
+    } else {
+      this.logger.log(`⚠️ [PersonalizedContent] Gemini não disponível para exercícios, tentando OpenAI`);
+    }
+
+    // Tentar usar OpenAI como segunda opção
     if (this.openaiService.isAvailable()) {
       try {
         this.logger.log(`🤖 [PersonalizedContent] Usando OpenAI para gerar exercícios para usuário ${userProfile.id}`);
@@ -450,5 +488,27 @@ export class PersonalizedContentService {
         category: "eye_movement"
       }
     ];
+  }
+
+  /**
+   * Converte UserProfile local para UserProfile do Gemini
+   */
+  private convertToGeminiProfile(userProfile: UserProfile): import('./gemini.service').UserProfile {
+    return {
+      id: userProfile.id.toString(),
+      name: userProfile.name,
+      email: `user${userProfile.id}@kumona.app`, // Email fictício baseado no ID
+      birthDate: userProfile.birthDate,
+      medicalHistory: {
+        existingConditions: userProfile.medicalHistory?.existingConditions || [],
+        familyHistory: userProfile.medicalHistory?.familyHistory || [],
+        medications: userProfile.medicalHistory?.medications || []
+      },
+      diagnoses: (userProfile.diagnoses || []).map(diagnosis => ({
+        condition: diagnosis.condition,
+        severity: diagnosis.severity,
+        date: diagnosis.createdAt
+      }))
+    };
   }
 }

@@ -10,6 +10,9 @@ import { ProgressModule } from './progress/progress.module';
 import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { AdminModule } from './admin/admin.module';
+import { ClinicModule } from './clinic/clinic.module';
+import { MLModule } from './ml/ml.module';
 import { HealthController } from './health.controller';
 import { AppModule as AppInfoModule } from './app/app.module';
 import { HelpModule } from './help/help.module';
@@ -31,6 +34,9 @@ import configuration from './config/configuration';
     AiModule,
     NotificationsModule,
     WebsocketModule,
+    AdminModule,
+    ClinicModule,
+    MLModule,
     AppInfoModule,
     HelpModule,
   ],

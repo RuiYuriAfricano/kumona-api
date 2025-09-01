@@ -88,7 +88,7 @@ export class AuthService {
     }
 
     // Gerar token JWT
-    const token = this.generateToken(user.id, user.email);
+    const token = this.generateToken(user.id, user.email, user.role);
 
     // Remover a senha do objeto de retorno
     const { password: _, ...result } = user;
@@ -128,7 +128,7 @@ export class AuthService {
     }
 
     // Gerar token JWT
-    const token = this.generateToken(user.id, user.email);
+    const token = this.generateToken(user.id, user.email, user.role);
 
     // Remover a senha do objeto de retorno
     const { password: _, ...result } = user;
@@ -139,8 +139,8 @@ export class AuthService {
     };
   }
 
-  private generateToken(userId: number, email: string): string {
-    const payload: JwtPayload = { sub: userId, email };
+  private generateToken(userId: number, email: string, role: string): string {
+    const payload: JwtPayload = { sub: userId, email, role: role as any };
     return this.jwtService.sign(payload);
   }
 
@@ -344,7 +344,7 @@ export class AuthService {
     }
 
     // Gerar token JWT
-    const token = this.generateToken(user.id, user.email);
+    const token = this.generateToken(user.id, user.email, user.role);
 
     // Remover a senha do objeto de retorno
     const { password: _, ...result } = user;
@@ -390,7 +390,7 @@ export class AuthService {
     });
 
     // Gerar token JWT
-    const token = this.generateToken(updatedUser.id, updatedUser.email);
+    const token = this.generateToken(updatedUser.id, updatedUser.email, updatedUser.role);
 
     // Remover a senha do objeto de retorno
     const { password: _, ...result } = updatedUser;

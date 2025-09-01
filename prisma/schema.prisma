@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  USER
+  CLINIC
+  ADMIN
+}
+
+enum ClinicStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 model User {
   id              Int                 @id @default(autoincrement())
   name            String
@@ -16,6 +29,7 @@ model User {
   about           String?
   phone           String?
   profileImage    String?             @default("https://www.w3schools.com/howto/img_avatar.png")
+  role            UserRole            @default(USER)
   deleted         Boolean             @default(false)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -29,6 +43,13 @@ model User {
   userTips        UserTip[]
   userExercises   UserExercise[]
   savedTips       SavedTip[]
+
+  // Relações específicas para clínicas
+  clinic          Clinic?
+  patients        Patient[]           // Pacientes atendidos (se for clínica)
+
+  // Relações para admin
+  approvedClinics Clinic[]           @relation("AdminApprovals")
 }
 
 model MedicalHistory {
@@ -170,5 +191,143 @@ model SavedTip {
   @@unique([userId, tipId, tipType])
   @@unique([userId, userTipId, tipType])
   @@index([userId])
+}
+
+// Modelo para Clínicas
+model Clinic {
+  id              Int           @id @default(autoincrement())
+  name            String
+  cnpj            String        @unique
+  address         String
+  city            String
+  state           String
+  zipCode         String
+  phone           String
+  email           String        @unique
+  website         String?
+  specialties     String[]      // Especialidades médicas
+  description     String?
+  logo            String?
+  status          ClinicStatus  @default(PENDING)
+
+  // Dados do responsável
+  responsibleName String
+  responsibleCpf  String
+  responsibleCrm  String?       // CRM do médico responsável
+
+  // Relacionamentos
+  userId          Int           @unique
+  user            User          @relation(fields: [userId], references: [id])
+  approvedBy      Int?
+  approver        User?         @relation("AdminApprovals", fields: [approvedBy], references: [id])
+  patients        Patient[]
+  patientDiagnoses PatientDiagnosis[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  approvedAt      DateTime?
+
+  @@index([status])
+  @@index([city, state])
+}
+
+// Modelo para Pacientes
+model Patient {
+  id              Int           @id @default(autoincrement())
+  name            String
+  email           String?
+  phone           String?
+  cpf             String?       @unique
+  birthDate       DateTime
+  gender          String?       // M, F, Other
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+
+  // Dados médicos
+  allergies       String[]      @default([])
+  medications     String[]      @default([])
+  medicalHistory  String[]      @default([])
+
+  // Relacionamentos
+  clinicId        Int
+  clinic          Clinic        @relation(fields: [clinicId], references: [id])
+  addedBy         Int           // Usuário da clínica que adicionou
+  addedByUser     User          @relation(fields: [addedBy], references: [id])
+
+  // Diagnósticos
+  diagnoses       PatientDiagnosis[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([clinicId])
+  @@index([cpf])
+}
+
+// Diagnósticos específicos para pacientes de clínicas
+model PatientDiagnosis {
+  id              Int           @id @default(autoincrement())
+  imageUrl        String
+  condition       String
+  severity        String        // low, medium, high
+  score           Int           // 0-100
+  description     String
+  recommendations String[]
+
+  // Validação por especialista
+  validated       Boolean       @default(false)
+  validatedBy     Int?
+  validatedAt     DateTime?
+  specialistNotes String?
+  correctedCondition String?    // Se o especialista corrigir
+  correctedSeverity String?
+
+  // Relacionamentos
+  patientId       Int
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  clinicId        Int
+  clinic          Clinic        @relation(fields: [clinicId], references: [id])
+
+  // Feedback para ML
+  feedback        SpecialistFeedback?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([patientId])
+  @@index([clinicId])
+  @@index([validated])
+}
+
+// Feedback de especialistas para melhorar o modelo
+model SpecialistFeedback {
+  id                    Int               @id @default(autoincrement())
+  diagnosisId           Int               @unique
+  diagnosis             PatientDiagnosis  @relation(fields: [diagnosisId], references: [id])
+
+  // Avaliação do especialista
+  isCorrect             Boolean           // Se o diagnóstico da IA estava correto
+  correctCondition      String?           // Condição correta segundo especialista
+  correctSeverity       String?           // Severidade correta
+  confidence            Int               // Confiança do especialista (1-10)
+  notes                 String?           // Observações do especialista
+
+  // Dados do especialista
+  specialistName        String
+  specialistCrm         String
+  specialistSpecialty   String
+
+  // Status do feedback
+  processed             Boolean           @default(false)  // Se foi usado para treinar o modelo
+  processedAt           DateTime?
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([isCorrect])
+  @@index([processed])
+  @@index([specialistCrm])
 }
 

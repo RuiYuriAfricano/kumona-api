@@ -15,6 +15,23 @@ export default () => ({
   ai: {
     serviceUrl: process.env.AI_SERVICE_URL,
     apiKey: process.env.AI_SERVICE_API_KEY,
+    fallbackToSimulation: process.env.AI_FALLBACK_TO_SIMULATION === 'true',
+    openai: {
+      apiKey: process.env.AI_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+      url: process.env.AI_OPENAI_URL || 'https://api.openai.com/v1/chat/completions',
+    },
+    google: {
+      apiKey: process.env.AI_GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
+      url: process.env.AI_GOOGLE_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+    },
+    azure: {
+      apiKey: process.env.AI_AZURE_API_KEY,
+      url: process.env.AI_AZURE_URL,
+    },
+    custom: {
+      apiKey: process.env.AI_CUSTOM_API_KEY,
+      url: process.env.AI_CUSTOM_URL,
+    },
   },
   email: {
     host: process.env.EMAIL_HOST,

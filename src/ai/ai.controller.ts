@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DailyContentService } from './daily-content.service';
 import { PersonalizedContentService } from './personalized-content.service';
 import { OpenAIService, UserProfile } from './openai.service';
+import { GeminiService } from './gemini.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('ai')
@@ -14,6 +15,7 @@ export class AiController {
     private dailyContentService: DailyContentService,
     private personalizedContentService: PersonalizedContentService,
     private openaiService: OpenAIService,
+    private geminiService: GeminiService,
     private prisma: PrismaService
   ) {}
 
@@ -170,20 +172,48 @@ export class AiController {
     };
   }
 
+  @Get('gemini/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Verificar status do Gemini',
+    description: 'Retorna se o serviço Gemini está disponível'
+  })
+  @ApiResponse({ status: 200, description: 'Status retornado' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async getGeminiStatus() {
+    return {
+      available: this.geminiService.isAvailable(),
+      message: this.geminiService.isAvailable()
+        ? 'Gemini service is available'
+        : 'Gemini service is not configured'
+    };
+  }
+
   // ========== ROTAS DESPROTEGIDAS PARA TESTE ==========
 
   @Get('test/status')
   @ApiOperation({
-    summary: '[TESTE] Verificar status do OpenAI (sem autenticação)',
-    description: 'Endpoint público para testar se o OpenAI está funcionando'
+    summary: '[TESTE] Verificar status dos serviços de IA (sem autenticação)',
+    description: 'Endpoint público para testar se os serviços de IA estão funcionando'
   })
   @ApiResponse({ status: 200, description: 'Status retornado' })
-  async testOpenAIStatusPublic() {
+  async testAIServicesStatusPublic() {
     return {
-      available: this.openaiService.isAvailable(),
-      message: this.openaiService.isAvailable()
-        ? 'OpenAI service is available and ready for testing'
-        : 'OpenAI service is not configured',
+      services: {
+        gemini: {
+          available: this.geminiService.isAvailable(),
+          message: this.geminiService.isAvailable()
+            ? 'Gemini service is available and ready for testing'
+            : 'Gemini service is not configured'
+        },
+        openai: {
+          available: this.openaiService.isAvailable(),
+          message: this.openaiService.isAvailable()
+            ? 'OpenAI service is available and ready for testing'
+            : 'OpenAI service is not configured'
+        }
+      },
+      priority: 'Gemini > OpenAI > Fallback',
       timestamp: new Date().toISOString()
     };
   }
@@ -221,8 +251,9 @@ export class AiController {
     try {
       // Criar perfil de usuário de exemplo
       const sampleUserProfile = {
-        id: 999,
+        id: '999',
         name: 'João Silva',
+        email: 'joao.silva@demo.com',
         birthDate: new Date('1990-05-15'),
         medicalHistory: {
           existingConditions: ['Miopia leve'],
@@ -233,14 +264,39 @@ export class AiController {
           {
             condition: 'Fadiga ocular digital',
             severity: 'medium',
-            score: 65,
-            createdAt: new Date()
+            date: new Date()
           }
         ]
       };
 
-      if (this.openaiService.isAvailable()) {
-        const aiTips = await this.openaiService.generatePersonalizedTips(sampleUserProfile, 5);
+      // Tentar Gemini primeiro
+      if (this.geminiService.isAvailable()) {
+        const aiTips = await this.geminiService.generatePersonalizedTips(sampleUserProfile, 5);
+        return {
+          success: true,
+          method: 'Google Gemini 1.5 Flash',
+          userProfile: {
+            name: sampleUserProfile.name,
+            age: new Date().getFullYear() - sampleUserProfile.birthDate.getFullYear(),
+            conditions: sampleUserProfile.medicalHistory.existingConditions,
+            recentDiagnosis: sampleUserProfile.diagnoses[0].condition
+          },
+          tips: aiTips,
+          timestamp: new Date().toISOString()
+        };
+      } else if (this.openaiService.isAvailable()) {
+        // Converter perfil para OpenAI (que espera id como number e createdAt)
+        const openaiProfile = {
+          ...sampleUserProfile,
+          id: parseInt(sampleUserProfile.id),
+          diagnoses: sampleUserProfile.diagnoses.map(d => ({
+            condition: d.condition,
+            severity: d.severity,
+            score: 65, // Score padrão para teste
+            createdAt: d.date
+          }))
+        };
+        const aiTips = await this.openaiService.generatePersonalizedTips(openaiProfile, 5);
         return {
           success: true,
           method: 'OpenAI GPT-3.5-turbo',
@@ -256,8 +312,8 @@ export class AiController {
       } else {
         return {
           success: false,
-          method: 'Fallback (OpenAI not available)',
-          message: 'OpenAI service not configured, would use fallback logic',
+          method: 'Fallback (No AI services available)',
+          message: 'Neither Gemini nor OpenAI services are configured, would use fallback logic',
           timestamp: new Date().toISOString()
         };
       }
@@ -280,8 +336,9 @@ export class AiController {
     try {
       // Criar perfil de usuário de exemplo
       const sampleUserProfile = {
-        id: 999,
+        id: '999',
         name: 'Maria Santos',
+        email: 'maria.santos@demo.com',
         birthDate: new Date('1985-08-20'),
         medicalHistory: {
           existingConditions: ['Olho seco'],
@@ -292,14 +349,39 @@ export class AiController {
           {
             condition: 'Síndrome do olho seco',
             severity: 'low',
-            score: 45,
-            createdAt: new Date()
+            date: new Date()
           }
         ]
       };
 
-      if (this.openaiService.isAvailable()) {
-        const aiExercises = await this.openaiService.generatePersonalizedExercises(sampleUserProfile, 3);
+      // Tentar Gemini primeiro
+      if (this.geminiService.isAvailable()) {
+        const aiExercises = await this.geminiService.generatePersonalizedExercises(sampleUserProfile, 3);
+        return {
+          success: true,
+          method: 'Google Gemini 1.5 Flash',
+          userProfile: {
+            name: sampleUserProfile.name,
+            age: new Date().getFullYear() - sampleUserProfile.birthDate.getFullYear(),
+            conditions: sampleUserProfile.medicalHistory.existingConditions,
+            recentDiagnosis: sampleUserProfile.diagnoses[0].condition
+          },
+          exercises: aiExercises,
+          timestamp: new Date().toISOString()
+        };
+      } else if (this.openaiService.isAvailable()) {
+        // Converter perfil para OpenAI (que espera id como number e createdAt)
+        const openaiProfile = {
+          ...sampleUserProfile,
+          id: parseInt(sampleUserProfile.id),
+          diagnoses: sampleUserProfile.diagnoses.map(d => ({
+            condition: d.condition,
+            severity: d.severity,
+            score: 45, // Score padrão para teste
+            createdAt: d.date
+          }))
+        };
+        const aiExercises = await this.openaiService.generatePersonalizedExercises(openaiProfile, 3);
         return {
           success: true,
           method: 'OpenAI GPT-3.5-turbo',
@@ -315,8 +397,126 @@ export class AiController {
       } else {
         return {
           success: false,
-          method: 'Fallback (OpenAI not available)',
-          message: 'OpenAI service not configured, would use fallback logic',
+          method: 'Fallback (No AI services available)',
+          message: 'Neither Gemini nor OpenAI services are configured, would use fallback logic',
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Post('test/gemini/generate-tips')
+  @ApiOperation({
+    summary: '[TESTE] Gerar dicas usando apenas Gemini (sem autenticação)',
+    description: 'Endpoint público para testar geração de dicas especificamente com Gemini'
+  })
+  @ApiResponse({ status: 200, description: 'Dicas geradas com Gemini' })
+  async generateGeminiTips(): Promise<any> {
+    try {
+      const sampleUserProfile = {
+        id: '999',
+        name: 'Ana Costa',
+        email: 'ana.costa@demo.com',
+        birthDate: new Date('1992-03-10'),
+        medicalHistory: {
+          existingConditions: ['Astigmatismo', 'Fadiga ocular'],
+          familyHistory: ['Miopia (mãe)'],
+          medications: []
+        },
+        diagnoses: [
+          {
+            condition: 'Síndrome da visão computacional',
+            severity: 'medium',
+            date: new Date()
+          }
+        ]
+      };
+
+      if (this.geminiService.isAvailable()) {
+        const geminiTips = await this.geminiService.generatePersonalizedTips(sampleUserProfile, 5);
+        return {
+          success: true,
+          method: 'Google Gemini 1.5 Flash',
+          userProfile: {
+            name: sampleUserProfile.name,
+            age: new Date().getFullYear() - sampleUserProfile.birthDate.getFullYear(),
+            conditions: sampleUserProfile.medicalHistory.existingConditions,
+            recentDiagnosis: sampleUserProfile.diagnoses[0].condition
+          },
+          tips: geminiTips,
+          timestamp: new Date().toISOString(),
+          note: 'Generated exclusively with Gemini AI'
+        };
+      } else {
+        return {
+          success: false,
+          method: 'Gemini not available',
+          message: 'Gemini service is not configured. Please set GEMINI_API_KEY environment variable.',
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Post('test/gemini/generate-exercises')
+  @ApiOperation({
+    summary: '[TESTE] Gerar exercícios usando apenas Gemini (sem autenticação)',
+    description: 'Endpoint público para testar geração de exercícios especificamente com Gemini'
+  })
+  @ApiResponse({ status: 200, description: 'Exercícios gerados com Gemini' })
+  async generateGeminiExercises(): Promise<any> {
+    try {
+      const sampleUserProfile = {
+        id: '999',
+        name: 'Carlos Oliveira',
+        email: 'carlos.oliveira@demo.com',
+        birthDate: new Date('1988-11-25'),
+        medicalHistory: {
+          existingConditions: ['Presbiopia inicial'],
+          familyHistory: ['Glaucoma (pai)'],
+          medications: ['Óculos de leitura']
+        },
+        diagnoses: [
+          {
+            condition: 'Presbiopia',
+            severity: 'low',
+            date: new Date()
+          }
+        ]
+      };
+
+      if (this.geminiService.isAvailable()) {
+        const geminiExercises = await this.geminiService.generatePersonalizedExercises(sampleUserProfile, 3);
+        return {
+          success: true,
+          method: 'Google Gemini 1.5 Flash',
+          userProfile: {
+            name: sampleUserProfile.name,
+            age: new Date().getFullYear() - sampleUserProfile.birthDate.getFullYear(),
+            conditions: sampleUserProfile.medicalHistory.existingConditions,
+            recentDiagnosis: sampleUserProfile.diagnoses[0].condition
+          },
+          exercises: geminiExercises,
+          timestamp: new Date().toISOString(),
+          note: 'Generated exclusively with Gemini AI'
+        };
+      } else {
+        return {
+          success: false,
+          method: 'Gemini not available',
+          message: 'Gemini service is not configured. Please set GEMINI_API_KEY environment variable.',
           timestamp: new Date().toISOString()
         };
       }
@@ -784,6 +984,90 @@ export class AiController {
     } catch (error) {
       return {
         success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Get('test/classifier/status')
+  @ApiOperation({
+    summary: '[TESTE] Verificar status da API de classificação (sem autenticação)',
+    description: 'Endpoint público para testar se a API ai-kumona-classifier está funcionando'
+  })
+  @ApiResponse({ status: 200, description: 'Status da API de classificação' })
+  async testClassifierStatus(): Promise<any> {
+    try {
+      const customUrl = process.env.AI_CUSTOM_URL;
+
+      if (!customUrl) {
+        return {
+          success: false,
+          message: 'URL da API de classificação não configurada',
+          config: {
+            AI_CUSTOM_URL: 'não configurado',
+            expected: 'http://localhost:8000'
+          },
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Testar endpoint de health da API de classificação
+      const axios = require('axios');
+      const healthResponse = await axios.get(`${customUrl}/health`, { timeout: 10000 });
+
+      return {
+        success: true,
+        message: 'API de classificação está funcionando',
+        classifierUrl: customUrl,
+        healthStatus: healthResponse.data,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        message: `Erro ao conectar com API de classificação: ${error.message}`,
+        classifierUrl: process.env.AI_CUSTOM_URL,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  @Get('test/classifier/classes')
+  @ApiOperation({
+    summary: '[TESTE] Obter classes disponíveis da API de classificação',
+    description: 'Endpoint público para verificar as classes que a API de classificação pode detectar'
+  })
+  @ApiResponse({ status: 200, description: 'Classes disponíveis' })
+  async testClassifierClasses(): Promise<any> {
+    try {
+      const customUrl = process.env.AI_CUSTOM_URL;
+
+      if (!customUrl) {
+        return {
+          success: false,
+          message: 'URL da API de classificação não configurada',
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      const axios = require('axios');
+      const classesResponse = await axios.get(`${customUrl}/classes`, { timeout: 10000 });
+
+      return {
+        success: true,
+        message: 'Classes obtidas com sucesso',
+        classifierUrl: customUrl,
+        classes: classesResponse.data,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        message: `Erro ao obter classes: ${error.message}`,
         error: error.message,
         timestamp: new Date().toISOString()
       };

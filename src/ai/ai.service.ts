@@ -253,17 +253,115 @@ export class AiService {
 
   private async analyzeWithCustomAI(provider: AIProviderConfig, imagePath: string): Promise<EyeAnalysisResult> {
     const formData = new FormData();
-    formData.append('image', fs.createReadStream(imagePath));
+    formData.append('file', fs.createReadStream(imagePath));
 
-    const response = await axios.post<EyeAnalysisResult>(provider.url, formData, {
+    // Para a API ai-kumona-classifier, o endpoint é /predict
+    const predictUrl = provider.url.endsWith('/predict') ? provider.url : `${provider.url}/predict`;
+
+    const response = await axios.post(predictUrl, formData, {
       headers: {
         ...formData.getHeaders(),
-        'Authorization': `Bearer ${provider.apiKey}`,
+        // A API ai-kumona-classifier não requer Authorization header por padrão
+        // 'Authorization': `Bearer ${provider.apiKey}`,
       },
       timeout: provider.timeout,
     });
 
-    return response.data;
+    // Converter resposta da API ai-kumona-classifier para nosso formato
+    return this.processKumonaClassifierResponse(response.data);
+  }
+
+  private processKumonaClassifierResponse(data: any): EyeAnalysisResult {
+    // Mapear as classes da API de classificação para condições mais descritivas
+    const classMapping = {
+      'normal': 'Olhos saudáveis',
+      'cataract': 'Catarata',
+      'diabetic_retinopathy': 'Retinopatia diabética',
+      'glaucoma': 'Glaucoma'
+    };
+
+    // Mapear severidade baseada na confiança
+    const confidence = data.confidence || 0;
+    let severity: 'low' | 'medium' | 'high' = 'low';
+
+    if (confidence > 0.8) {
+      severity = 'high';
+    } else if (confidence > 0.6) {
+      severity = 'medium';
+    }
+
+    // Se não for normal, aumentar a severidade
+    if (data.predicted_class !== 'normal') {
+      severity = confidence > 0.7 ? 'high' : 'medium';
+    }
+
+    const condition = classMapping[data.predicted_class] || data.predicted_class;
+    const score = Math.round((1 - confidence) * 100); // Inverter para score de risco
+
+    // Gerar recomendações baseadas na condição detectada
+    let recommendations = [];
+    let description = '';
+
+    switch (data.predicted_class) {
+      case 'normal':
+        description = 'Análise indica olhos saudáveis. Continue mantendo bons hábitos de cuidado ocular.';
+        recommendations = [
+          'Continue fazendo pausas regulares durante o uso de telas',
+          'Mantenha uma dieta rica em vitaminas A, C e E',
+          'Use óculos de sol com proteção UV',
+          'Realize exames oftalmológicos anuais'
+        ];
+        break;
+      case 'cataract':
+        description = 'Possíveis sinais de catarata detectados. Recomenda-se avaliação oftalmológica.';
+        recommendations = [
+          'Consulte um oftalmologista imediatamente',
+          'Evite exposição excessiva à luz solar',
+          'Mantenha controle de diabetes se aplicável',
+          'Considere cirurgia se recomendado pelo médico'
+        ];
+        break;
+      case 'diabetic_retinopathy':
+        description = 'Sinais de retinopatia diabética detectados. Atenção médica urgente é necessária.';
+        recommendations = [
+          'Procure um oftalmologista especialista em retina urgentemente',
+          'Mantenha controle rigoroso da glicemia',
+          'Monitore pressão arterial regularmente',
+          'Siga rigorosamente o tratamento para diabetes'
+        ];
+        break;
+      case 'glaucoma':
+        description = 'Possíveis sinais de glaucoma detectados. Avaliação oftalmológica é essencial.';
+        recommendations = [
+          'Consulte um oftalmologista especialista em glaucoma',
+          'Monitore pressão intraocular regularmente',
+          'Evite atividades que aumentem pressão ocular',
+          'Siga tratamento prescrito rigorosamente'
+        ];
+        break;
+      default:
+        description = `Condição detectada: ${condition}. Recomenda-se avaliação profissional.`;
+        recommendations = [
+          'Consulte um oftalmologista para avaliação detalhada',
+          'Monitore sintomas e mudanças na visão',
+          'Mantenha hábitos saudáveis de cuidado ocular'
+        ];
+    }
+
+    return {
+      condition,
+      severity,
+      score,
+      description,
+      recommendations,
+      confidence,
+      analysisDetails: {
+        detectedFeatures: [data.predicted_class],
+        riskFactors: data.predicted_class !== 'normal' ? ['Condição ocular detectada'] : [],
+        healthIndicators: data.all_predictions ? Object.keys(data.all_predictions) : []
+      },
+      provider: 'Kumona AI Classifier'
+    };
   }
 
   // Métodos auxiliares para processar respostas

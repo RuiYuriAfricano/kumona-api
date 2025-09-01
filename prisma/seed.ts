@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole, ClinicStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -7,6 +7,10 @@ async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
 
   // Limpar dados existentes (opcional - descomente se necessário)
+  // await prisma.specialistFeedback.deleteMany();
+  // await prisma.patientDiagnosis.deleteMany();
+  // await prisma.patient.deleteMany();
+  // await prisma.clinic.deleteMany();
   // await prisma.notification.deleteMany();
   // await prisma.eyeImage.deleteMany();
   // await prisma.diagnosis.deleteMany();
@@ -20,6 +24,23 @@ async function main() {
   // Criar usuários de exemplo
   const hashedPassword = await bcrypt.hash('123456', 10);
 
+  // 1. ADMIN USER
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@kumona.com' },
+    update: {},
+    create: {
+      name: 'Administrador Kumona',
+      email: 'admin@kumona.com',
+      password: hashedPassword,
+      birthDate: new Date('1980-01-01'),
+      about: 'Administrador do sistema Kumona Vision Care',
+      phone: '+244 900 000 000',
+      role: UserRole.ADMIN,
+      profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  // 2. REGULAR USERS
   const user1 = await prisma.user.upsert({
     where: { email: 'joao@example.com' },
     update: {},
@@ -30,6 +51,7 @@ async function main() {
       birthDate: new Date('1990-05-15'),
       about: 'Desenvolvedor de software interessado em saúde ocular',
       phone: '+244 923 456 789',
+      role: UserRole.USER,
       profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
     },
   });
@@ -44,7 +66,120 @@ async function main() {
       birthDate: new Date('1985-08-22'),
       about: 'Professora que passa muito tempo em frente ao computador',
       phone: '+244 912 345 678',
+      role: UserRole.USER,
       profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  // 3. CLINIC USERS
+  const clinicUser1 = await prisma.user.upsert({
+    where: { email: 'clinica.visao@example.com' },
+    update: {},
+    create: {
+      name: 'Dr. Carlos Mendes',
+      email: 'clinica.visao@example.com',
+      password: hashedPassword,
+      birthDate: new Date('1975-03-10'),
+      about: 'Oftalmologista especializado em doenças da retina',
+      phone: '+244 933 111 222',
+      role: UserRole.CLINIC,
+      profileImage: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  const clinicUser2 = await prisma.user.upsert({
+    where: { email: 'centro.oftalmico@example.com' },
+    update: {},
+    create: {
+      name: 'Dra. Ana Ferreira',
+      email: 'centro.oftalmico@example.com',
+      password: hashedPassword,
+      birthDate: new Date('1982-07-18'),
+      about: 'Oftalmologista com especialização em glaucoma',
+      phone: '+244 944 333 444',
+      role: UserRole.CLINIC,
+      profileImage: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  // 4. CRIAR CLÍNICAS
+  const clinic1 = await prisma.clinic.create({
+    data: {
+      name: 'Clínica Visão Clara',
+      cnpj: '12.345.678/0001-90',
+      address: 'Rua das Flores, 123',
+      city: 'Luanda',
+      state: 'LU',
+      zipCode: '10000-000',
+      phone: '(244) 933-111-222',
+      email: 'contato@visaoclara.ao',
+      website: 'https://visaoclara.ao',
+      specialties: ['Oftalmologia Geral', 'Retina', 'Glaucoma'],
+      description: 'Clínica especializada em cuidados oftalmológicos com tecnologia de ponta.',
+      status: ClinicStatus.APPROVED,
+      responsibleName: 'Dr. Carlos Mendes',
+      responsibleCpf: '123.456.789-01',
+      responsibleCrm: 'CRM-AO 12345',
+      userId: clinicUser1.id,
+      approvedBy: adminUser.id,
+      approvedAt: new Date(),
+    },
+  });
+
+  const clinic2 = await prisma.clinic.create({
+    data: {
+      name: 'Centro Oftálmico de Angola',
+      cnpj: '98.765.432/0001-10',
+      address: 'Avenida Principal, 456',
+      city: 'Benguela',
+      state: 'BE',
+      zipCode: '20000-000',
+      phone: '(244) 944-333-444',
+      email: 'info@centrooftalmico.ao',
+      website: 'https://centrooftalmico.ao',
+      specialties: ['Glaucoma', 'Catarata', 'Cirurgia Refrativa'],
+      description: 'Centro especializado em diagnóstico e tratamento de doenças oculares.',
+      status: ClinicStatus.APPROVED,
+      responsibleName: 'Dra. Ana Ferreira',
+      responsibleCpf: '987.654.321-09',
+      responsibleCrm: 'CRM-AO 67890',
+      userId: clinicUser2.id,
+      approvedBy: adminUser.id,
+      approvedAt: new Date(),
+    },
+  });
+
+  // Clínica pendente de aprovação
+  const clinicUser3 = await prisma.user.create({
+    data: {
+      name: 'Dr. Pedro Costa',
+      email: 'clinica.nova@example.com',
+      password: hashedPassword,
+      birthDate: new Date('1978-11-25'),
+      about: 'Oftalmologista recém-formado',
+      phone: '+244 955 666 777',
+      role: UserRole.CLINIC,
+      profileImage: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  const clinic3 = await prisma.clinic.create({
+    data: {
+      name: 'Clínica Olhar Novo',
+      cnpj: '11.222.333/0001-44',
+      address: 'Rua da Esperança, 789',
+      city: 'Huambo',
+      state: 'HU',
+      zipCode: '30000-000',
+      phone: '(244) 955-666-777',
+      email: 'contato@olharnovo.ao',
+      specialties: ['Oftalmologia Geral', 'Pediatria Oftálmica'],
+      description: 'Nova clínica focada em atendimento oftalmológico de qualidade.',
+      status: ClinicStatus.PENDING,
+      responsibleName: 'Dr. Pedro Costa',
+      responsibleCpf: '111.222.333-44',
+      responsibleCrm: 'CRM-AO 11111',
+      userId: clinicUser3.id,
     },
   });
 
@@ -68,6 +203,87 @@ async function main() {
       existingConditions: ['Olho seco'],
       familyHistory: ['Catarata (mãe)'],
       medications: [],
+    },
+  });
+
+  // 5. CRIAR PACIENTES DAS CLÍNICAS
+  const patient1 = await prisma.patient.create({
+    data: {
+      name: 'José Manuel',
+      email: 'jose.manuel@email.com',
+      phone: '(244) 911-222-333',
+      cpf: '123.456.789-10',
+      birthDate: new Date('1965-04-12'),
+      gender: 'M',
+      address: 'Rua A, 100',
+      city: 'Luanda',
+      state: 'LU',
+      zipCode: '10001-000',
+      allergies: ['Penicilina'],
+      medications: ['Colírio para glaucoma'],
+      medicalHistory: ['Hipertensão', 'Diabetes tipo 2'],
+      clinicId: clinic1.id,
+      addedBy: clinicUser1.id,
+    },
+  });
+
+  const patient2 = await prisma.patient.create({
+    data: {
+      name: 'Ana Beatriz',
+      email: 'ana.beatriz@email.com',
+      phone: '(244) 922-333-444',
+      cpf: '987.654.321-10',
+      birthDate: new Date('1992-08-30'),
+      gender: 'F',
+      address: 'Avenida B, 200',
+      city: 'Luanda',
+      state: 'LU',
+      zipCode: '10002-000',
+      allergies: [],
+      medications: ['Vitaminas para os olhos'],
+      medicalHistory: ['Miopia'],
+      clinicId: clinic1.id,
+      addedBy: clinicUser1.id,
+    },
+  });
+
+  const patient3 = await prisma.patient.create({
+    data: {
+      name: 'Carlos Alberto',
+      email: 'carlos.alberto@email.com',
+      phone: '(244) 933-444-555',
+      cpf: '456.789.123-10',
+      birthDate: new Date('1958-12-05'),
+      gender: 'M',
+      address: 'Rua C, 300',
+      city: 'Benguela',
+      state: 'BE',
+      zipCode: '20001-000',
+      allergies: ['Sulfa'],
+      medications: ['Colírio anti-inflamatório'],
+      medicalHistory: ['Catarata bilateral'],
+      clinicId: clinic2.id,
+      addedBy: clinicUser2.id,
+    },
+  });
+
+  const patient4 = await prisma.patient.create({
+    data: {
+      name: 'Mariana Silva',
+      email: 'mariana.silva@email.com',
+      phone: '(244) 944-555-666',
+      cpf: '789.123.456-10',
+      birthDate: new Date('1988-06-15'),
+      gender: 'F',
+      address: 'Avenida D, 400',
+      city: 'Benguela',
+      state: 'BE',
+      zipCode: '20002-000',
+      allergies: [],
+      medications: [],
+      medicalHistory: ['Olho seco'],
+      clinicId: clinic2.id,
+      addedBy: clinicUser2.id,
     },
   });
 
@@ -185,7 +401,158 @@ async function main() {
     });
   }
 
-  // Criar diagnósticos de exemplo
+  // 6. CRIAR DIAGNÓSTICOS DE PACIENTES DAS CLÍNICAS
+  const patientDiagnosis1 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'glaucoma',
+      severity: 'high',
+      score: 92,
+      description: 'Sinais claros de glaucoma detectados. Pressão intraocular elevada e danos no nervo óptico.',
+      recommendations: [
+        'Consulta urgente com oftalmologista',
+        'Medição da pressão intraocular',
+        'Exame de campo visual',
+        'Possível necessidade de colírios hipotensores'
+      ],
+      patientId: patient1.id,
+      clinicId: clinic1.id,
+      validated: true,
+      validatedBy: clinicUser1.id,
+      validatedAt: new Date(),
+      specialistNotes: 'Diagnóstico confirmado. Paciente já em tratamento.',
+    },
+  });
+
+  const patientDiagnosis2 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'normal',
+      severity: 'low',
+      score: 88,
+      description: 'Olhos saudáveis sem sinais de patologias. Exame preventivo normal.',
+      recommendations: [
+        'Manter consultas oftalmológicas regulares',
+        'Proteger os olhos da exposição solar',
+        'Manter dieta rica em vitaminas A, C e E'
+      ],
+      patientId: patient2.id,
+      clinicId: clinic1.id,
+      validated: true,
+      validatedBy: clinicUser1.id,
+      validatedAt: new Date(),
+      specialistNotes: 'Exame preventivo normal. Paciente orientada.',
+    },
+  });
+
+  const patientDiagnosis3 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'cataract',
+      severity: 'medium',
+      score: 78,
+      description: 'Catarata bilateral em estágio moderado. Visão parcialmente comprometida.',
+      recommendations: [
+        'Avaliação para cirurgia de catarata',
+        'Uso de óculos de sol com proteção UV',
+        'Evitar dirigir à noite',
+        'Acompanhamento oftalmológico regular'
+      ],
+      patientId: patient3.id,
+      clinicId: clinic2.id,
+      validated: false, // Pendente de validação
+    },
+  });
+
+  const patientDiagnosis4 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'diabetic_retinopathy',
+      severity: 'high',
+      score: 85,
+      description: 'Retinopatia diabética detectada. Necessária avaliação especializada urgente.',
+      recommendations: [
+        'Consulta urgente com especialista em retina',
+        'Controle rigoroso da glicemia',
+        'Monitoramento da pressão arterial',
+        'Exames de fundo de olho periódicos'
+      ],
+      patientId: patient4.id,
+      clinicId: clinic2.id,
+      validated: true,
+      validatedBy: clinicUser2.id,
+      validatedAt: new Date(),
+      specialistNotes: 'Diagnóstico correto. Paciente encaminhada para especialista em retina.',
+      correctedCondition: 'diabetic_retinopathy', // Confirmado pelo especialista
+      correctedSeverity: 'high',
+    },
+  });
+
+  // 7. CRIAR FEEDBACK DE ESPECIALISTAS
+  const feedback1 = await prisma.specialistFeedback.create({
+    data: {
+      diagnosisId: patientDiagnosis1.id,
+      isCorrect: true,
+      confidence: 9,
+      notes: 'Diagnóstico preciso. IA identificou corretamente os sinais de glaucoma.',
+      specialistName: 'Dr. Carlos Mendes',
+      specialistCrm: 'CRM-AO 12345',
+      specialistSpecialty: 'Oftalmologia Geral',
+      processed: false,
+    },
+  });
+
+  const feedback2 = await prisma.specialistFeedback.create({
+    data: {
+      diagnosisId: patientDiagnosis4.id,
+      isCorrect: true,
+      correctCondition: 'diabetic_retinopathy',
+      correctSeverity: 'high',
+      confidence: 10,
+      notes: 'Excelente detecção de retinopatia diabética. IA muito precisa neste caso.',
+      specialistName: 'Dra. Ana Ferreira',
+      specialistCrm: 'CRM-AO 67890',
+      specialistSpecialty: 'Glaucoma e Retina',
+      processed: false,
+    },
+  });
+
+  // Diagnóstico com correção (para treinar a IA)
+  const patientDiagnosis5 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'normal', // IA disse normal
+      severity: 'low',
+      score: 65,
+      description: 'Olhos aparentemente saudáveis.',
+      recommendations: ['Manter cuidados preventivos'],
+      patientId: patient1.id,
+      clinicId: clinic1.id,
+      validated: true,
+      validatedBy: clinicUser1.id,
+      validatedAt: new Date(),
+      specialistNotes: 'IA errou. Há sinais iniciais de glaucoma.',
+      correctedCondition: 'glaucoma', // Especialista corrigiu
+      correctedSeverity: 'low',
+    },
+  });
+
+  const feedback3 = await prisma.specialistFeedback.create({
+    data: {
+      diagnosisId: patientDiagnosis5.id,
+      isCorrect: false, // IA errou
+      correctCondition: 'glaucoma',
+      correctSeverity: 'low',
+      confidence: 8,
+      notes: 'IA não detectou sinais iniciais de glaucoma. Necessário melhorar sensibilidade para casos iniciais.',
+      specialistName: 'Dr. Carlos Mendes',
+      specialistCrm: 'CRM-AO 12345',
+      specialistSpecialty: 'Oftalmologia Geral',
+      processed: false, // Será usado para treinar a IA
+    },
+  });
+
+  // Criar diagnósticos de exemplo (usuários regulares)
   const diagnosis1 = await prisma.diagnosis.create({
     data: {
       userId: user1.id,
@@ -317,12 +684,36 @@ async function main() {
   }
 
   console.log('✅ Seed concluído com sucesso!');
-  console.log(`👤 Usuários criados: ${user1.name}, ${user2.name}`);
-  console.log(`💡 ${preventionTips.length} dicas de prevenção criadas`);
-  console.log(`🏃 ${eyeExercises.length} exercícios oculares criados`);
-  console.log(`🔬 ${3} diagnósticos de exemplo criados`);
-  console.log(`📋 ${preventionActivities.length} atividades de prevenção criadas`);
-  console.log(`🔔 ${notifications.length} notificações criadas`);
+  console.log('📊 Dados criados:');
+  console.log(`   👥 Usuários: 6 (1 admin, 2 regulares, 3 clínicas)`);
+  console.log(`   🏥 Clínicas: 3 (2 aprovadas, 1 pendente)`);
+  console.log(`   👤 Pacientes: 4`);
+  console.log(`   🔍 Diagnósticos de pacientes: 5`);
+  console.log(`   💬 Feedback de especialistas: 3`);
+  console.log(`   🏥 Histórico médico: 2`);
+  console.log(`   ⚙️ Preferências: 2`);
+  console.log(`   🔍 Diagnósticos regulares: 3`);
+  console.log(`   💡 Dicas de prevenção: ${preventionTips.length}`);
+  console.log(`   👁️ Exercícios oculares: ${eyeExercises.length}`);
+  console.log(`   🏃‍♂️ Atividades de prevenção: ${preventionActivities.length}`);
+  console.log(`   🔔 Notificações: ${notifications.length}`);
+  console.log('');
+  console.log('🔑 Credenciais de acesso:');
+  console.log('');
+  console.log('👨‍💼 ADMIN:');
+  console.log('   📧 Email: admin@kumona.com');
+  console.log('   🔒 Senha: 123456');
+  console.log('');
+  console.log('🏥 CLÍNICAS:');
+  console.log('   📧 Email: clinica.visao@example.com (Aprovada)');
+  console.log('   📧 Email: centro.oftalmico@example.com (Aprovada)');
+  console.log('   📧 Email: clinica.nova@example.com (Pendente)');
+  console.log('   🔒 Senha: 123456');
+  console.log('');
+  console.log('👤 USUÁRIOS REGULARES:');
+  console.log('   📧 Email: joao@example.com');
+  console.log('   📧 Email: maria@example.com');
+  console.log('   🔒 Senha: 123456');
 }
 
 main()
