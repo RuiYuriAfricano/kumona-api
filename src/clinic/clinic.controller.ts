@@ -267,6 +267,46 @@ export class ClinicController {
     return this.patientDiagnosisService.getPatientDiagnoses(req.user.id, patientId);
   }
 
+  @Get('diagnoses')
+  @ApiOperation({ summary: 'Listar todos os diagnósticos da clínica' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Número da página (padrão: 1)'
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Itens por página (padrão: 10)'
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Filtrar por status (PENDING, VALIDATED, REJECTED)'
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Buscar por nome do paciente ou condição'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de diagnósticos retornada com sucesso'
+  })
+  async getAllDiagnoses(
+    @Request() req,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('status') status?: string,
+    @Query('search') search?: string
+  ) {
+    return this.patientDiagnosisService.getAllClinicDiagnoses(req.user.id, page, limit, status, search);
+  }
+
   @Get('diagnoses/:diagnosisId')
   @ApiOperation({ summary: 'Obter detalhes de um diagnóstico específico' })
   @ApiParam({

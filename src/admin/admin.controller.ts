@@ -169,4 +169,82 @@ export class AdminController {
   ) {
     return this.adminService.promoteToAdmin(req.user.id, userId);
   }
+
+  @Get('reports/overview')
+  @ApiOperation({ summary: 'Obter relatório geral do sistema (apenas admin)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Relatório geral retornado com sucesso'
+  })
+  async getSystemOverviewReport(@Request() req) {
+    return this.adminService.getSystemOverviewReport(req.user.id);
+  }
+
+  @Get('reports/growth')
+  @ApiOperation({ summary: 'Obter relatório de crescimento (apenas admin)' })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    type: String,
+    description: 'Período do relatório (7d, 30d, 90d, 1y)'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Relatório de crescimento retornado com sucesso'
+  })
+  async getGrowthReport(
+    @Request() req,
+    @Query('period') period: string = '30d'
+  ) {
+    return this.adminService.getGrowthReport(req.user.id, period);
+  }
+
+  @Get('reports/diagnoses')
+  @ApiOperation({ summary: 'Obter relatório de diagnósticos (apenas admin)' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'Data de início (YYYY-MM-DD)'
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'Data de fim (YYYY-MM-DD)'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Relatório de diagnósticos retornado com sucesso'
+  })
+  async getDiagnosesReport(
+    @Request() req,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.adminService.getDiagnosesReport(req.user.id, startDate, endDate);
+  }
+
+  @Get('settings')
+  @ApiOperation({ summary: 'Obter configurações do sistema (apenas admin)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Configurações retornadas com sucesso'
+  })
+  async getSystemSettings(@Request() req) {
+    return this.adminService.getSystemSettings(req.user.id);
+  }
+
+  @Put('settings')
+  @ApiOperation({ summary: 'Atualizar configurações do sistema (apenas admin)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Configurações atualizadas com sucesso'
+  })
+  async updateSystemSettings(
+    @Request() req,
+    @Body() settings: any
+  ) {
+    return this.adminService.updateSystemSettings(req.user.id, settings);
+  }
 }

@@ -222,6 +222,88 @@ export class PatientDiagnosisService {
   }
 
   /**
+   * Listar todos os diagnósticos da clínica com paginação e filtros
+   */
+  async getAllClinicDiagnoses(
+    userId: number,
+    page: number = 1,
+    limit: number = 10,
+    status?: string,
+    search?: string
+  ) {
+    const clinic = await this.verifyClinicRole(userId);
+
+    const where: any = {
+      clinicId: clinic.id
+    };
+
+    // Filtro por status
+    if (status) {
+      if (status === 'PENDING') {
+        where.validated = false;
+      } else if (status === 'VALIDATED') {
+        where.validated = true;
+      }
+    }
+
+    // Filtro por busca (nome do paciente ou condição)
+    if (search) {
+      where.OR = [
+        {
+          patient: {
+            name: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          }
+        },
+        {
+          condition: {
+            contains: search,
+            mode: 'insensitive'
+          }
+        }
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [diagnoses, total] = await Promise.all([
+      this.prisma.patientDiagnosis.findMany({
+        where,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              birthDate: true,
+              gender: true
+            }
+          },
+          feedback: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: limit
+      }),
+      this.prisma.patientDiagnosis.count({ where })
+    ]);
+
+    return {
+      data: diagnoses,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
    * Obter detalhes de um diagnóstico específico
    */
   async getDiagnosisById(userId: number, diagnosisId: number) {
