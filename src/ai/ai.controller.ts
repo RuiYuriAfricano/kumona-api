@@ -79,17 +79,7 @@ export class AiController {
     return this.personalizedContentService.getDailyTips(req.user.id);
   }
 
-  @Get('user/daily-exercises')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({
-    summary: 'Obter exercícios diários do usuário atual',
-    description: 'Retorna os exercícios personalizados ativos para o usuário'
-  })
-  @ApiResponse({ status: 200, description: 'Exercícios retornados com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async getUserDailyExercises(@Request() req) {
-    return this.personalizedContentService.getDailyExercises(req.user.id);
-  }
+
 
   @Post('user/generate-tips')
   @UseGuards(JwtAuthGuard)
@@ -117,31 +107,7 @@ export class AiController {
     }
   }
 
-  @Post('user/generate-exercises')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({
-    summary: 'Gerar novos exercícios para o usuário atual',
-    description: 'Força a geração de novos exercícios personalizados'
-  })
-  @ApiResponse({ status: 201, description: 'Exercícios gerados com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async generateUserExercises(@Request() req) {
-    try {
-      await this.personalizedContentService.generateDailyExercises(req.user.id);
-      const newExercises = await this.personalizedContentService.getDailyExercises(req.user.id);
 
-      return {
-        success: true,
-        message: `${newExercises.length} exercícios gerados com sucesso`,
-        exercises: newExercises
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Erro ao gerar exercícios: ${error.message}`
-      };
-    }
-  }
 
   @Get('openai/test-connection')
   @UseGuards(JwtAuthGuard)
@@ -571,10 +537,7 @@ export class AiController {
 
       if (result.success) {
         // Buscar o conteúdo gerado
-        const [tips, exercises] = await Promise.all([
-          this.personalizedContentService.getDailyTips(userId),
-          this.personalizedContentService.getDailyExercises(userId)
-        ]);
+        const tips = await this.personalizedContentService.getDailyTips(userId);
 
         return {
           success: true,
@@ -582,9 +545,7 @@ export class AiController {
           userId,
           content: {
             tips: tips.length,
-            exercises: exercises.length,
-            generatedTips: tips,
-            generatedExercises: exercises
+            generatedTips: tips
           },
           timestamp: new Date().toISOString()
         };
@@ -609,9 +570,8 @@ export class AiController {
   @ApiResponse({ status: 200, description: 'Conteúdo do usuário retornado' })
   async getUserContent(@Param('userId', ParseIntPipe) userId: number): Promise<any> {
     try {
-      const [tips, exercises, savedTips] = await Promise.all([
+      const [tips, savedTips] = await Promise.all([
         this.personalizedContentService.getDailyTips(userId),
-        this.personalizedContentService.getDailyExercises(userId),
         this.personalizedContentService.getSavedTips(userId)
       ]);
 
@@ -623,10 +583,7 @@ export class AiController {
             count: tips.length,
             tips: tips
           },
-          dailyExercises: {
-            count: exercises.length,
-            exercises: exercises
-          },
+
           savedTips: {
             count: savedTips.totalSaved,
             savedTipIds: savedTips.savedTipIds
@@ -653,9 +610,8 @@ export class AiController {
   async clearAIContent(): Promise<any> {
     try {
       // Usar o serviço do Prisma diretamente para limpar
-      const [deletedTips, deletedExercises, deletedSavedTips] = await Promise.all([
+      const [deletedTips, deletedSavedTips] = await Promise.all([
         this.personalizedContentService['prisma'].userTip.deleteMany({}),
-        this.personalizedContentService['prisma'].userExercise.deleteMany({}),
         this.personalizedContentService['prisma'].savedTip.deleteMany({})
       ]);
 
@@ -664,7 +620,6 @@ export class AiController {
         message: 'Todo conteúdo IA foi limpo do banco de dados',
         deleted: {
           tips: deletedTips.count,
-          exercises: deletedExercises.count,
           savedTips: deletedSavedTips.count
         },
         timestamp: new Date().toISOString()

@@ -193,4 +193,27 @@ export class DiagnosisController {
   ) {
     return this.diagnosisService.getDiagnosisById(req.user.id, id);
   }
+
+  @Post('validate-fundoscopy')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Validar se a imagem é de fundoscopia usando IA do Gemini' })
+  @ApiResponse({ status: 200, description: 'Validação concluída' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        imageData: {
+          type: 'string',
+          description: 'Imagem em base64'
+        }
+      }
+    }
+  })
+  async validateFundoscopyImage(
+    @Request() req,
+    @Body() body: { imageData: string }
+  ) {
+    return this.diagnosisService.validateFundoscopyImage(body.imageData);
+  }
 }

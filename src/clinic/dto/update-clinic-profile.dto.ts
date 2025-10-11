@@ -26,19 +26,17 @@ export class UpdateClinicProfileDto {
   @Length(2, 2)
   state?: string;
 
-  @ApiPropertyOptional({ description: 'CEP' })
+  @ApiPropertyOptional({ description: 'Código Postal' })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{5}-?\d{3}$/, {
-    message: 'CEP deve estar no formato XXXXX-XXX'
-  })
+  @Length(0, 20)
   zipCode?: string;
 
   @ApiPropertyOptional({ description: 'Telefone da clínica' })
   @IsOptional()
   @IsString()
-  @Matches(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, {
-    message: 'Telefone deve estar no formato (XX) XXXXX-XXXX'
+  @Matches(/^\(\d{3}\)\s\d{3}-\d{3}-\d{3}$|^\+\d{3}\s\d{3}\s\d{3}\s\d{3}$/, {
+    message: 'Telefone deve estar no formato (244) XXX-XXX-XXX ou +244 XXX XXX XXX'
   })
   phone?: string;
 

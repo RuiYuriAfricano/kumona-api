@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Delete, Param, Body, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Put, Delete, Param, Body, UseGuards, Request, ParseIntPipe, Patch, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dtos/update-user.dto';
@@ -114,5 +114,35 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   async softDeleteUser(@Param('id', ParseIntPipe) id: number) {
     return this.userService.softDeleteUser(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('complete-first-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Marcar primeiro login como completo',
+    description: 'Marca que o usuário já completou o primeiro login e não deve mais ver a tela de boas-vindas'
+  })
+  @ApiResponse({ status: 200, description: 'Primeiro login marcado como completo' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async completeFirstLogin(@Request() req) {
+    await this.userService.markFirstLoginComplete(req.user.id);
+    return { message: 'Primeiro login marcado como completo' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('select-clinic')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Selecionar clínica para acompanhamento',
+    description: 'Permite ao usuário selecionar uma clínica para acompanhar sua jornada de saúde ocular'
+  })
+  @ApiResponse({ status: 200, description: 'Clínica selecionada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  @ApiResponse({ status: 404, description: 'Clínica não encontrada' })
+  async selectClinic(@Request() req, @Body() body: { clinicId: number }) {
+    await this.userService.selectClinic(req.user.id, body.clinicId);
+    return { message: 'Clínica selecionada com sucesso' };
   }
 }

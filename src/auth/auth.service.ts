@@ -99,6 +99,13 @@ export class AuthService {
     };
   }
 
+  async markFirstLoginComplete(userId: number) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { isFirstLogin: false },
+    });
+  }
+
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdateClinicProfileDto } from './dto/update-clinic-profile.dto';
@@ -112,9 +113,9 @@ export class ClinicService {
     const clinic = await this.verifyClinicRole(userId);
 
     // Verificar se CPF já existe (se fornecido)
-    if (createPatientDto.cpf) {
+    if (createPatientDto.bi) {
       const existingPatient = await this.prisma.patient.findUnique({
-        where: { cpf: createPatientDto.cpf }
+        where: { bi: createPatientDto.bi }
       });
 
       if (existingPatient) {
@@ -254,9 +255,9 @@ export class ClinicService {
     }
 
     // Verificar se CPF já existe (se estiver sendo alterado)
-    if (updateData.cpf && updateData.cpf !== patient.cpf) {
+    if (updateData.bi && updateData.bi !== patient.bi) {
       const existingPatient = await this.prisma.patient.findUnique({
-        where: { cpf: updateData.cpf }
+        where: { bi: updateData.bi }
       });
 
       if (existingPatient) {
@@ -399,5 +400,193 @@ export class ClinicService {
     this.logger.log(`Paciente ${patientId} marcado para exclusão pela clínica ${clinic.id}`);
 
     return { message: 'Paciente removido com sucesso' };
+  }
+
+  /**
+   * Registrar novo usuário pela clínica
+   */
+  async registerUser(userId: number, userData: { name: string; email: string; phone?: string }) {
+    const clinic = await this.verifyClinicRole(userId);
+
+    // Verificar se o email já existe
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: userData.email }
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('Este email já está cadastrado no sistema');
+    }
+
+    // Gerar senha aleatória
+    const generatePassword = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let password = '';
+      for (let i = 0; i < 8; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return password;
+    };
+
+    const temporaryPassword = generatePassword();
+
+    // Hash da senha temporária
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+
+    // Criar o usuário
+    const newUser = await this.prisma.user.create({
+      data: {
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        password: hashedPassword,
+        role: UserRole.USER,
+        birthDate: new Date('1990-01-01') // Data padrão para usuários registrados pela clínica
+      }
+    });
+
+    this.logger.log(`Novo usuário ${newUser.id} registrado pela clínica ${clinic.id}`);
+
+    // Retornar as credenciais para a clínica mostrar ao usuário
+    return {
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone
+      },
+      credentials: {
+        email: newUser.email,
+        password: temporaryPassword
+      },
+      message: 'Usuário registrado com sucesso. Forneça as credenciais ao paciente.'
+    };
+  }
+
+  /**
+   * Obter usuários que selecionaram esta clínica para acompanhamento
+   */
+  async getSelectedUsers(userId: number, page: number = 1, limit: number = 10, search?: string) {
+    const clinic = await this.verifyClinicRole(userId);
+
+    const where: any = {
+      selectedClinicId: clinic.id,
+      role: UserRole.USER,
+      deleted: false
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          birthDate: true,
+          profileImage: true,
+          createdAt: true,
+          diagnoses: {
+            select: {
+              id: true,
+              condition: true,
+              severity: true,
+              score: true,
+              createdAt: true
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1 // Último diagnóstico
+          }
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.user.count({ where })
+    ]);
+
+    return {
+      data: users.map(user => ({
+        ...user,
+        lastDiagnosis: user.diagnoses[0] || null,
+        diagnoses: undefined // Remove o array completo, mantém apenas o último
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * Obter histórico de diagnósticos de um usuário específico
+   */
+  async getUserDiagnoses(clinicUserId: number, userId: number, page: number = 1, limit: number = 10) {
+    const clinic = await this.verifyClinicRole(clinicUserId);
+
+    // Verificar se o usuário selecionou esta clínica
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        selectedClinicId: clinic.id,
+        role: UserRole.USER,
+        deleted: false
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        birthDate: true
+      }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado ou não selecionou esta clínica para acompanhamento');
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [diagnoses, total] = await Promise.all([
+      this.prisma.diagnosis.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          imageUrl: true,
+          condition: true,
+          severity: true,
+          score: true,
+          description: true,
+          recommendations: true,
+          createdAt: true
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.diagnosis.count({ where: { userId } })
+    ]);
+
+    return {
+      user,
+      diagnoses: {
+        data: diagnoses,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }
+    };
   }
 }

@@ -45,131 +45,134 @@ export class PersonalizedContentService {
   ) {}
 
   /**
-   * Gera e salva dicas personalizadas diárias para um usuário
+   * Gera dicas personalizadas para um usuário (método público)
    */
-  async generateDailyTips(userId: number): Promise<void> {
-    try {
-      this.logger.log(`🤖 [PersonalizedContent] Gerando dicas diárias para usuário ${userId}`);
-
-      // Desativar dicas antigas (display = false)
-      await this.prisma.userTip.updateMany({
-        where: { userId, display: true },
-        data: { display: false }
-      });
-
-      // Gerar novas dicas personalizadas
-      const userProfile = await this.getUserProfile(userId);
-      const newTips = await this.generateTipsWithAI(userProfile, 10);
-
-      // Salvar novas dicas no banco
-      for (const tip of newTips) {
-        await this.prisma.userTip.create({
-          data: {
-            title: tip.title,
-            description: tip.description,
-            category: tip.category,
-            display: true,
-            generatedBy: 'ai',
-            userId
-          }
-        });
-      }
-
-      this.logger.log(`✅ [PersonalizedContent] ${newTips.length} dicas diárias geradas para usuário ${userId}`);
-
-    } catch (error) {
-      this.logger.error(`❌ [PersonalizedContent] Erro ao gerar dicas diárias para usuário ${userId}:`, error);
-      throw error;
-    }
+  async generatePersonalizedTips(userProfile: UserProfile, count: number = 5): Promise<GeneratedTip[]> {
+    return this.generateTipsWithAI(userProfile, count);
   }
 
   /**
-   * Gera e salva exercícios personalizados diários para um usuário
+   * Gera e salva dicas personalizadas diárias para um usuário
+   * SOLUÇÃO ULTRA-SIMPLES: Apenas verifica data e gera se necessário
    */
-  async generateDailyExercises(userId: number): Promise<void> {
-    try {
-      this.logger.log(`🤖 [PersonalizedContent] Gerando exercícios diários para usuário ${userId}`);
+  async generateDailyTips(userId: number): Promise<void> {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-      // Desativar exercícios antigos (display = false)
-      await this.prisma.userExercise.updateMany({
-        where: { userId, display: true },
-        data: { display: false }
-      });
+    this.logger.log(`🤖 [PersonalizedContent] Verificando dicas para usuário ${userId} - data: ${today}`);
 
-      // Gerar novos exercícios personalizados
-      const userProfile = await this.getUserProfile(userId);
-      const newExercises = await this.generateExercisesWithAI(userProfile, 3);
-
-      // Salvar novos exercícios no banco
-      for (const exercise of newExercises) {
-        await this.prisma.userExercise.create({
-          data: {
-            title: exercise.title,
-            description: exercise.description,
-            instructions: exercise.instructions,
-            duration: exercise.duration,
-            category: exercise.category,
-            display: true,
-            generatedBy: 'ai',
-            userId
-          }
-        });
+    // Verificar se já existem dicas para hoje (SIMPLES!)
+    const existingTips = await this.prisma.userTip.findMany({
+      where: {
+        userId,
+        dailyDate: today
       }
+    });
 
-      this.logger.log(`✅ [PersonalizedContent] ${newExercises.length} exercícios diários gerados para usuário ${userId}`);
-
-    } catch (error) {
-      this.logger.error(`❌ [PersonalizedContent] Erro ao gerar exercícios diários para usuário ${userId}:`, error);
-      throw error;
+    // Se já tem dicas para hoje, não fazer nada
+    if (existingTips.length > 0) {
+      this.logger.log(`✅ [PersonalizedContent] Usuário ${userId} já possui ${existingTips.length} dicas para ${today}`);
+      return;
     }
+
+    this.logger.log(`🤖 [PersonalizedContent] Gerando dicas para usuário ${userId} - data: ${today}`);
+
+    // Gerar novas dicas
+    const userProfile = await this.getUserProfile(userId);
+    const newTips = await this.generateTipsWithAI(userProfile, 10);
+
+    // Salvar com data de hoje (SIMPLES!)
+    for (const tip of newTips) {
+      await this.prisma.userTip.create({
+        data: {
+          title: tip.title,
+          description: tip.description,
+          category: tip.category,
+          display: true,
+          generatedBy: 'ai',
+          userId,
+          dailyDate: today // Campo simples com data
+        }
+      });
+    }
+
+    this.logger.log(`✅ [PersonalizedContent] ${newTips.length} dicas geradas para usuário ${userId} - data: ${today}`);
   }
+
+
 
   /**
    * Obtém dicas diárias ativas do usuário
+   * SOLUÇÃO ULTRA-SIMPLES: Busca por data de hoje
    */
   async getDailyTips(userId: number) {
-    return this.prisma.userTip.findMany({
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Buscar dicas de hoje (SIMPLES!)
+    const tips = await this.prisma.userTip.findMany({
       where: {
         userId,
-        display: true
+        dailyDate: today
       },
       orderBy: {
         createdAt: 'desc'
       }
     });
+
+    this.logger.log(`📅 [PersonalizedContent] Retornando ${tips.length} dicas para usuário ${userId} - data: ${today}`);
+    return tips;
   }
 
-  /**
-   * Obtém exercícios diários ativos do usuário
-   */
-  async getDailyExercises(userId: number) {
-    return this.prisma.userExercise.findMany({
-      where: {
-        userId,
-        display: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-  }
+
 
   /**
    * Salva uma dica como favorita
    */
   async saveTip(userId: number, tipId: number, tipType: 'general' | 'personal') {
-    const data: any = {
-      userId,
-      tipType
-    };
+    try {
+      this.logger.log(`🔍 [PersonalizedContentService] saveTip iniciado: userId=${userId}, tipId=${tipId}, tipType=${tipType}`);
 
-    if (tipType === 'general') {
-      data.tipId = tipId;
-    } else {
-      data.userTipId = tipId;
+      const data: any = {
+        userId,
+        tipType
+      };
+
+      if (tipType === 'general') {
+        data.tipId = tipId;
+      } else {
+        data.userTipId = tipId;
+      }
+
+      this.logger.log(`🔍 [PersonalizedContentService] Dados para salvar:`, data);
+
+      // Verificar se já existe antes de criar para evitar erro de constraint única
+      const existingTip = await this.prisma.savedTip.findFirst({
+        where: {
+          userId,
+          tipType,
+          ...(tipType === 'general' ? { tipId } : { userTipId: tipId })
+        }
+      });
+
+      if (existingTip) {
+        this.logger.log(`[saveTip] Dica ${tipId} (${tipType}) já está salva para usuário ${userId}`);
+        return existingTip;
+      }
+
+      this.logger.log(`🔍 [PersonalizedContentService] Criando nova entrada na tabela savedTip...`);
+      const result = await this.prisma.savedTip.create({ data });
+      this.logger.log(`✅ [PersonalizedContentService] Dica salva com sucesso:`, result);
+
+      return result;
+    } catch (error) {
+      this.logger.error(`❌ [PersonalizedContentService] Erro em saveTip:`, {
+        message: error.message,
+        stack: error.stack,
+        userId,
+        tipId,
+        tipType
+      });
+      throw error;
     }
-
-    return this.prisma.savedTip.create({ data });
   }
 
   /**
@@ -199,18 +202,27 @@ export class PersonalizedContentService {
     });
 
     // Buscar detalhes das dicas salvas
-    const generalTipIds = savedTips.filter(st => st.tipType === 'general' && st.tipId).map(st => st.tipId);
-    const personalTipIds = savedTips.filter(st => st.tipType === 'personal' && st.userTipId).map(st => st.userTipId);
+    const generalTipIds = savedTips.filter(st => st.tipType === 'general' && st.tipId).map(st => st.tipId).filter(id => id !== null);
+    const personalTipIds = savedTips.filter(st => st.tipType === 'personal' && st.userTipId).map(st => st.userTipId).filter(id => id !== null);
 
+    // CORREÇÃO: Buscar dicas salvas independentemente do status display
+    // Para dicas pessoais, incluir tanto ativas quanto inativas
     const [generalTips, personalTips] = await Promise.all([
       generalTipIds.length > 0 ? this.prisma.preventionTip.findMany({
         where: { id: { in: generalTipIds } }
       }) : [],
       personalTipIds.length > 0 ? this.prisma.userTip.findMany({
         where: { id: { in: personalTipIds } }
+        // Removido filtro display: true para incluir dicas inativas que foram salvas
       }) : []
     ]);
 
+    // Log para debug
+    this.logger.log(`[getSavedTips] Usuário ${userId}: ${savedTips.length} dicas salvas, ${generalTipIds.length} gerais, ${personalTipIds.length} pessoais`);
+    this.logger.log(`[getSavedTips] IDs salvos originais - gerais: [${generalTipIds.join(', ')}], pessoais: [${personalTipIds.join(', ')}]`);
+    this.logger.log(`[getSavedTips] Dicas encontradas - gerais: ${generalTips.length}, pessoais: ${personalTips.length}`);
+
+    // Retornar os IDs originais que foram salvos
     return {
       savedTipIds: [...generalTipIds, ...personalTipIds],
       totalSaved: savedTips.length,
@@ -248,176 +260,33 @@ export class PersonalizedContentService {
   }
 
   /**
-   * Gera dicas usando IA real ou fallback baseado no perfil do usuário
-   * Prioridade: Gemini > OpenAI > Fallback
+   * Gera dicas usando APENAS Gemini - sem fallback estático
    */
   private async generateTipsWithAI(userProfile: UserProfile, count: number): Promise<GeneratedTip[]> {
-    // Tentar usar Gemini primeiro (prioridade)
-    if (this.geminiService.isAvailable()) {
-      try {
-        this.logger.log(`🤖 [PersonalizedContent] Usando Gemini para gerar dicas para usuário ${userProfile.id}`);
-        // Converter UserProfile local para UserProfile do Gemini
-        const geminiProfile = this.convertToGeminiProfile(userProfile);
-        const aiTips = await this.geminiService.generatePersonalizedTips(geminiProfile, count);
-        this.logger.log(`✅ [PersonalizedContent] Gemini gerou ${aiTips.length} dicas com sucesso`);
-        return aiTips;
-      } catch (error) {
-        this.logger.error(`❌ [PersonalizedContent] Erro ao usar Gemini, tentando OpenAI:`, error);
-        // Continuar para OpenAI
-      }
-    } else {
-      this.logger.log(`⚠️ [PersonalizedContent] Gemini não disponível, tentando OpenAI`);
+    // Verificar se Gemini está disponível
+    if (!this.geminiService.isAvailable()) {
+      this.logger.error(`❌ [PersonalizedContent] Gemini não está disponível - não é possível gerar dicas`);
+      throw new Error('Gemini service não está disponível. Configure GEMINI_API_KEY para gerar dicas personalizadas.');
     }
 
-    // Tentar usar OpenAI como segunda opção
-    if (this.openaiService.isAvailable()) {
-      try {
-        this.logger.log(`🤖 [PersonalizedContent] Usando OpenAI para gerar dicas para usuário ${userProfile.id}`);
-        const aiTips = await this.openaiService.generatePersonalizedTips(userProfile, count);
-        this.logger.log(`✅ [PersonalizedContent] OpenAI gerou ${aiTips.length} dicas com sucesso`);
-        return aiTips;
-      } catch (error) {
-        this.logger.error(`❌ [PersonalizedContent] Erro ao usar OpenAI, usando fallback:`, error);
-        // Continuar para fallback
-      }
-    } else {
-      this.logger.log(`⚠️ [PersonalizedContent] OpenAI não disponível, usando lógica de fallback`);
+    try {
+      this.logger.log(`🤖 [PersonalizedContent] Usando APENAS Gemini para gerar dicas para usuário ${userProfile.id}`);
+      // Converter UserProfile local para UserProfile do Gemini
+      const geminiProfile = this.convertToGeminiProfile(userProfile);
+      const aiTips = await this.geminiService.generatePersonalizedTips(geminiProfile, count);
+      this.logger.log(`✅ [PersonalizedContent] Gemini gerou ${aiTips.length} dicas com sucesso`);
+      return aiTips;
+    } catch (error) {
+      this.logger.error(`❌ [PersonalizedContent] Erro ao usar Gemini para gerar dicas:`, error);
+      throw new Error(`Falha ao gerar dicas com Gemini: ${error.message}`);
     }
-
-    // Fallback: usar lógica baseada em regras
-    return this.generateTipsWithFallback(userProfile, count);
   }
 
-  /**
-   * Gera dicas usando lógica de fallback (regras)
-   */
-  private async generateTipsWithFallback(userProfile: UserProfile, count: number): Promise<GeneratedTip[]> {
-    const age = this.calculateAge(userProfile.birthDate);
-    const hasConditions = userProfile.medicalHistory?.existingConditions?.length > 0;
-    const recentDiagnoses = userProfile.diagnoses?.slice(0, 3) || [];
 
-    const tips: GeneratedTip[] = [];
 
-    // Dicas baseadas na idade
-    if (age < 30) {
-      tips.push({
-        title: "Proteção Digital para Jovens",
-        description: `Olá ${userProfile.name}! Como você está na faixa dos ${age} anos, é importante estabelecer bons hábitos digitais desde cedo. Use a regra 20-20-20: a cada 20 minutos, olhe para algo a 20 pés de distância por 20 segundos.`,
-        category: "digital_health"
-      });
-    } else if (age >= 40) {
-      tips.push({
-        title: "Cuidados Especiais após os 40",
-        description: `${userProfile.name}, após os 40 anos, os olhos precisam de atenção especial. Faça exames regulares para detectar precocemente glaucoma e degeneração macular.`,
-        category: "checkup"
-      });
-    }
 
-    // Dicas baseadas em condições médicas
-    if (hasConditions) {
-      tips.push({
-        title: "Cuidados Especiais para seu Histórico",
-        description: "Considerando seu histórico médico, mantenha consultas regulares com oftalmologista e siga rigorosamente as orientações médicas.",
-        category: "medical_care"
-      });
-    }
 
-    // Completar com dicas genéricas personalizadas
-    const genericTips = this.getPersonalizedGenericTips(userProfile);
-    while (tips.length < count) {
-      const randomTip = genericTips[Math.floor(Math.random() * genericTips.length)];
-      tips.push(randomTip);
-    }
 
-    return tips.slice(0, count);
-  }
-
-  /**
-   * Gera exercícios usando IA real ou fallback baseado no perfil do usuário
-   * Prioridade: Gemini > OpenAI > Fallback
-   */
-  private async generateExercisesWithAI(userProfile: UserProfile, count: number): Promise<GeneratedExercise[]> {
-    // Tentar usar Gemini primeiro (prioridade)
-    if (this.geminiService.isAvailable()) {
-      try {
-        this.logger.log(`🤖 [PersonalizedContent] Usando Gemini para gerar exercícios para usuário ${userProfile.id}`);
-        // Converter UserProfile local para UserProfile do Gemini
-        const geminiProfile = this.convertToGeminiProfile(userProfile);
-        const aiExercises = await this.geminiService.generatePersonalizedExercises(geminiProfile, count);
-        this.logger.log(`✅ [PersonalizedContent] Gemini gerou ${aiExercises.length} exercícios com sucesso`);
-        return aiExercises;
-      } catch (error) {
-        this.logger.error(`❌ [PersonalizedContent] Erro ao usar Gemini para exercícios, tentando OpenAI:`, error);
-        // Continuar para OpenAI
-      }
-    } else {
-      this.logger.log(`⚠️ [PersonalizedContent] Gemini não disponível para exercícios, tentando OpenAI`);
-    }
-
-    // Tentar usar OpenAI como segunda opção
-    if (this.openaiService.isAvailable()) {
-      try {
-        this.logger.log(`🤖 [PersonalizedContent] Usando OpenAI para gerar exercícios para usuário ${userProfile.id}`);
-        const aiExercises = await this.openaiService.generatePersonalizedExercises(userProfile, count);
-        this.logger.log(`✅ [PersonalizedContent] OpenAI gerou ${aiExercises.length} exercícios com sucesso`);
-        return aiExercises;
-      } catch (error) {
-        this.logger.error(`❌ [PersonalizedContent] Erro ao usar OpenAI para exercícios, usando fallback:`, error);
-        // Continuar para fallback
-      }
-    } else {
-      this.logger.log(`⚠️ [PersonalizedContent] OpenAI não disponível para exercícios, usando lógica de fallback`);
-    }
-
-    // Fallback: usar lógica baseada em regras
-    return this.generateExercisesWithFallback(userProfile, count);
-  }
-
-  /**
-   * Gera exercícios usando lógica de fallback (regras)
-   */
-  private async generateExercisesWithFallback(userProfile: UserProfile, count: number): Promise<GeneratedExercise[]> {
-    const age = this.calculateAge(userProfile.birthDate);
-    const exercises: GeneratedExercise[] = [];
-
-    // Exercícios baseados na idade
-    if (age < 35) {
-      exercises.push({
-        title: "Foco Dinâmico para Jovens",
-        description: "Exercício de foco rápido ideal para quem usa muito dispositivos digitais",
-        instructions: [
-          "Segure o dedo a 15cm do rosto",
-          "Foque no dedo por 3 segundos",
-          "Mude o foco para um objeto distante por 3 segundos",
-          "Repita 10 vezes"
-        ],
-        duration: 5,
-        category: "focus_training"
-      });
-    } else {
-      exercises.push({
-        title: "Relaxamento Ocular Suave",
-        description: "Exercício de relaxamento adequado para olhos mais maduros",
-        instructions: [
-          "Feche os olhos suavemente",
-          "Respire profundamente por 30 segundos",
-          "Abra os olhos lentamente",
-          "Pisque 20 vezes devagar"
-        ],
-        duration: 3,
-        category: "relaxation"
-      });
-    }
-
-    // Completar com exercícios genéricos
-    const genericExercises = this.getGenericExercises();
-    while (exercises.length < count) {
-      const randomExercise = genericExercises[Math.floor(Math.random() * genericExercises.length)];
-      exercises.push(randomExercise);
-    }
-
-    return exercises.slice(0, count);
-  }
 
   /**
    * Calcula idade baseada na data de nascimento
@@ -435,60 +304,7 @@ export class PersonalizedContentService {
     return age;
   }
 
-  /**
-   * Dicas genéricas personalizadas
-   */
-  private getPersonalizedGenericTips(userProfile: UserProfile): GeneratedTip[] {
-    return [
-      {
-        title: "Hidratação Ocular Personalizada",
-        description: `${userProfile.name}, mantenha seus olhos hidratados bebendo bastante água e usando colírios lubrificantes quando necessário.`,
-        category: "hydration"
-      },
-      {
-        title: "Iluminação Adequada",
-        description: "Use sempre iluminação adequada ao ler ou trabalhar. Evite contrastes extremos entre a tela e o ambiente.",
-        category: "lighting"
-      },
-      {
-        title: "Pausas Regulares",
-        description: `${userProfile.name}, faça pausas regulares durante atividades que exigem foco visual prolongado.`,
-        category: "breaks"
-      }
-    ];
-  }
 
-  /**
-   * Exercícios genéricos
-   */
-  private getGenericExercises(): GeneratedExercise[] {
-    return [
-      {
-        title: "Piscar Consciente",
-        description: "Exercício simples para lubrificar os olhos",
-        instructions: [
-          "Pisque lentamente 20 vezes",
-          "Mantenha os olhos fechados por 2 segundos a cada piscada",
-          "Repita 3 vezes ao dia"
-        ],
-        duration: 2,
-        category: "lubrication"
-      },
-      {
-        title: "Movimentos Oculares",
-        description: "Fortalece os músculos oculares",
-        instructions: [
-          "Olhe para cima por 3 segundos",
-          "Olhe para baixo por 3 segundos",
-          "Olhe para esquerda por 3 segundos",
-          "Olhe para direita por 3 segundos",
-          "Repita 5 vezes"
-        ],
-        duration: 4,
-        category: "eye_movement"
-      }
-    ];
-  }
 
   /**
    * Converte UserProfile local para UserProfile do Gemini

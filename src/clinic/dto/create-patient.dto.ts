@@ -16,18 +16,18 @@ export class CreatePatientDto {
   @ApiPropertyOptional({ description: 'Telefone do paciente' })
   @IsOptional()
   @IsString()
-  @Matches(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, {
-    message: 'Telefone deve estar no formato (XX) XXXXX-XXXX'
+  @Matches(/^\(\d{3}\)\s\d{3}-\d{3}-\d{3}$|^\+\d{3}\s\d{3}\s\d{3}\s\d{3}$/, {
+    message: 'Telefone deve estar no formato (244) XXX-XXX-XXX ou +244 XXX XXX XXX'
   })
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'CPF do paciente' })
+  @ApiPropertyOptional({ description: 'BI do paciente' })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, {
-    message: 'CPF deve estar no formato XXX.XXX.XXX-XX'
+  @Matches(/^\d{9}[A-Z]{2}\d{3}$/, {
+    message: 'BI deve estar no formato NNNNNNNNNLLNNN (9 números + 2 letras + 3 números)'
   })
-  cpf?: string;
+  bi?: string;
 
   @ApiProperty({ description: 'Data de nascimento' })
   @IsDateString()
@@ -56,12 +56,10 @@ export class CreatePatientDto {
   @Length(0, 2)
   state?: string;
 
-  @ApiPropertyOptional({ description: 'CEP' })
+  @ApiPropertyOptional({ description: 'Código Postal' })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{5}-?\d{3}$/, {
-    message: 'CEP deve estar no formato XXXXX-XXX'
-  })
+  @Length(0, 20)
   zipCode?: string;
 
   @ApiPropertyOptional({ description: 'Alergias conhecidas', type: [String] })

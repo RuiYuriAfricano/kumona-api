@@ -358,13 +358,13 @@ export class PatientDiagnosisService {
     const confidence = Math.round(analysisResult.confidence * 100);
 
     const descriptions = {
-      normal: `Análise indica olho saudável com ${confidence}% de confiança. Não foram detectadas anomalias significativas.`,
-      cataract: `Possível presença de catarata detectada com ${confidence}% de confiança. Recomenda-se avaliação oftalmológica.`,
-      diabetic_retinopathy: `Sinais de retinopatia diabética identificados com ${confidence}% de confiança. Necessária avaliação especializada urgente.`,
-      glaucoma: `Indicadores de glaucoma detectados com ${confidence}% de confiança. Recomenda-se exame de pressão intraocular.`
+      normal: `Análise indica olho saudável com ${confidence}% de precisão. Não foram detectadas anomalias significativas.`,
+      cataract: `Possível presença de catarata detectada com ${confidence}% de precisão. Recomenda-se avaliação oftalmológica.`,
+      diabetic_retinopathy: `Sinais de retinopatia diabética identificados com ${confidence}% de precisão. Necessária avaliação especializada urgente.`,
+      glaucoma: `Indicadores de glaucoma detectados com ${confidence}% de precisão. Recomenda-se exame de pressão intraocular.`
     };
 
-    return descriptions[condition] || `Condição ${condition} detectada com ${confidence}% de confiança.`;
+    return descriptions[condition] || `Condição ${condition} detectada com ${confidence}% de precisão.`;
   }
 
   /**

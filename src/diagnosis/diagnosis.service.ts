@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { PersonalizedContentService } from '../ai/personalized-content.service';
 import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import { NextSuggestionResponseDto } from './dto/next-suggestion.dto';
 import { UploadImageResponseDto } from './dto/upload-image.dto';
@@ -16,6 +17,7 @@ export class DiagnosisService {
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
+    private personalizedContentService: PersonalizedContentService,
   ) {}
 
   async analyzeImage(userId: number, file: Express.Multer.File) {
@@ -46,6 +48,12 @@ export class DiagnosisService {
       // Remover arquivo temporário
       fs.unlinkSync(tempFilePath);
 
+      // Gerar recomendações personalizadas usando Gemini
+      const personalizedRecommendations = await this.generatePersonalizedRecommendations(
+        userId,
+        analysisResult
+      );
+
       // Salvar o diagnóstico no banco de dados
       const diagnosis = await this.prisma.diagnosis.create({
         data: {
@@ -54,7 +62,7 @@ export class DiagnosisService {
           severity: analysisResult.severity,
           score: analysisResult.score,
           description: analysisResult.description,
-          recommendations: analysisResult.recommendations,
+          recommendations: personalizedRecommendations,
           userId,
         },
       });
@@ -207,6 +215,12 @@ export class DiagnosisService {
       // Remover o arquivo temporário
       fs.unlinkSync(tempFilePath);
 
+      // Gerar recomendações personalizadas usando Gemini
+      const personalizedRecommendations = await this.generatePersonalizedRecommendations(
+        userId,
+        analysisResult
+      );
+
       // Salvar o diagnóstico no banco de dados
       const diagnosis = await this.prisma.diagnosis.create({
         data: {
@@ -215,7 +229,7 @@ export class DiagnosisService {
           severity: analysisResult.severity,
           score: analysisResult.score,
           description: analysisResult.description,
-          recommendations: analysisResult.recommendations,
+          recommendations: personalizedRecommendations,
           userId,
         },
       });
@@ -283,5 +297,116 @@ export class DiagnosisService {
       reason,
       severity: latestDiagnosis.severity,
     };
+  }
+
+  async validateFundoscopyImage(imageData: string): Promise<{
+    isValid: boolean;
+    reason: string;
+    confidence: number;
+  }> {
+    try {
+      this.logger.log('Iniciando validação de fundoscopia com Gemini');
+
+      // Remover o prefixo data:image/...;base64, se existir
+      const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
+
+      // Usar o serviço de IA para validar se é uma imagem de fundoscopia
+      const validation = await this.aiService.validateFundoscopyImage(base64Data);
+
+      this.logger.log('Validação de fundoscopia concluída', {
+        isValid: validation.isValid,
+        confidence: validation.confidence
+      });
+
+      return validation;
+    } catch (error) {
+      this.logger.error('Erro na validação de fundoscopia', error);
+
+      // Em caso de erro, permitir prosseguir
+      return {
+        isValid: true,
+        reason: 'Erro na validação, prosseguindo com análise',
+        confidence: 0
+      };
+    }
+  }
+
+  /**
+   * Gera recomendações personalizadas usando Gemini AI baseadas no perfil do usuário e resultado do diagnóstico
+   */
+  private async generatePersonalizedRecommendations(
+    userId: number,
+    analysisResult: any
+  ): Promise<string[]> {
+    try {
+      this.logger.log(`Gerando recomendações personalizadas para usuário ${userId}`);
+
+      // Buscar dados do usuário para criar perfil
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          diagnoses: {
+            orderBy: { createdAt: 'desc' },
+            take: 5 // Últimos 5 diagnósticos
+          }
+        }
+      });
+
+      if (!user) {
+        this.logger.warn(`Usuário ${userId} não encontrado, usando recomendações padrão`);
+        return analysisResult.recommendations || [];
+      }
+
+      // Criar perfil do usuário para o serviço de conteúdo personalizado
+      const userProfile = {
+        id: user.id,
+        name: user.name,
+        birthDate: user.birthDate,
+        medicalHistory: {
+          existingConditions: [], // Pode ser expandido no futuro
+          familyHistory: [],
+          medications: []
+        },
+        diagnoses: user.diagnoses.map(d => ({
+          condition: d.condition,
+          severity: d.severity,
+          score: d.score,
+          createdAt: d.createdAt
+        }))
+      };
+
+      // Adicionar o diagnóstico atual ao contexto
+      const currentDiagnosis = {
+        condition: analysisResult.condition,
+        severity: analysisResult.severity,
+        score: analysisResult.score,
+        date: new Date()
+      };
+
+      // Gerar recomendações personalizadas usando Gemini
+      const personalizedTips = await this.personalizedContentService.generatePersonalizedTips(
+        userProfile,
+        5 // Gerar 5 recomendações personalizadas
+      );
+
+      // Converter tips para formato de recomendações
+      const personalizedRecommendations = personalizedTips.map(tip =>
+        `${tip.title}: ${tip.description}`
+      );
+
+      // Se não conseguiu gerar recomendações personalizadas, usar as padrão
+      if (personalizedRecommendations.length === 0) {
+        this.logger.warn(`Não foi possível gerar recomendações personalizadas para usuário ${userId}, usando padrão`);
+        return analysisResult.recommendations || [];
+      }
+
+      this.logger.log(`Geradas ${personalizedRecommendations.length} recomendações personalizadas para usuário ${userId}`);
+      return personalizedRecommendations;
+
+    } catch (error) {
+      this.logger.error(`Erro ao gerar recomendações personalizadas para usuário ${userId}:`, error);
+      // Em caso de erro, retornar as recomendações padrão
+      return analysisResult.recommendations || [];
+    }
   }
 }

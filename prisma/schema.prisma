@@ -31,6 +31,8 @@ model User {
   profileImage    String?             @default("https://www.w3schools.com/howto/img_avatar.png")
   role            UserRole            @default(USER)
   deleted         Boolean             @default(false)
+  isFirstLogin    Boolean             @default(true)
+  selectedClinicId Int?               // Clínica selecionada para acompanhamento
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -41,11 +43,16 @@ model User {
   preferences     UserPreferences?
   notifications   Notification[]
   userTips        UserTip[]
-  userExercises   UserExercise[]
   savedTips       SavedTip[]
+
+  // Relações de gamificação
+  userProgress    UserProgress?
+  userPoints      UserPoints[]
+  reminders       Reminder[]
 
   // Relações específicas para clínicas
   clinic          Clinic?
+  selectedClinic  Clinic?             @relation("UserSelectedClinic", fields: [selectedClinicId], references: [id])
   patients        Patient[]           // Pacientes atendidos (se for clínica)
 
   // Relações para admin
@@ -111,16 +118,7 @@ model PreventionTip {
   @@index([display])
 }
 
-model EyeExercise {
-  id           Int      @id @default(autoincrement())
-  title        String
-  description  String
-  instructions String[]
-  duration     Int      // minutes
-  imageUrl     String?
-  videoUrl     String?
-  createdAt    DateTime @default(now())
-}
+
 
 model Notification {
   id        Int      @id @default(autoincrement())
@@ -152,31 +150,15 @@ model UserTip {
   generatedBy String   @default("ai") // ai, manual, system
   userId      Int
   user        User     @relation(fields: [userId], references: [id])
+  dailyDate   String   // Data no formato YYYY-MM-DD para cache diário simples
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([userId, display])
-  @@index([createdAt])
+  @@index([userId, dailyDate]) // Índice simples para busca por usuário e data
+  @@unique([userId, dailyDate, id]) // Garantir unicidade por usuário/data
 }
 
-// Exercícios personalizados por usuário gerados por IA
-model UserExercise {
-  id           Int      @id @default(autoincrement())
-  title        String
-  description  String
-  instructions String[]
-  duration     Int      // minutes
-  category     String   // eye_movement, focus, relaxation, etc
-  display      Boolean  @default(true) // Controls daily display rotation
-  generatedBy  String   @default("ai") // ai, manual, system
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 
-  @@index([userId, display])
-  @@index([createdAt])
-}
 
 // Dicas salvas pelo usuário
 model SavedTip {
@@ -197,7 +179,7 @@ model SavedTip {
 model Clinic {
   id              Int           @id @default(autoincrement())
   name            String
-  cnpj            String        @unique
+  nif             String        @unique
   address         String
   city            String
   state           String
@@ -212,14 +194,15 @@ model Clinic {
 
   // Dados do responsável
   responsibleName String
-  responsibleCpf  String
-  responsibleCrm  String?       // CRM do médico responsável
+  responsibleBi   String
+  responsibleOrmed String?      // ORMED do médico responsável
 
   // Relacionamentos
   userId          Int           @unique
   user            User          @relation(fields: [userId], references: [id])
   approvedBy      Int?
   approver        User?         @relation("AdminApprovals", fields: [approvedBy], references: [id])
+  selectedByUsers User[]        @relation("UserSelectedClinic") // Usuários que selecionaram esta clínica
   patients        Patient[]
   patientDiagnoses PatientDiagnosis[]
 
@@ -237,7 +220,7 @@ model Patient {
   name            String
   email           String?
   phone           String?
-  cpf             String?       @unique
+  bi              String?       @unique
   birthDate       DateTime
   gender          String?       // M, F, Other
   address         String?
@@ -263,7 +246,7 @@ model Patient {
   updatedAt       DateTime      @updatedAt
 
   @@index([clinicId])
-  @@index([cpf])
+  @@index([bi])
 }
 
 // Diagnósticos específicos para pacientes de clínicas
@@ -329,5 +312,129 @@ model SpecialistFeedback {
   @@index([isCorrect])
   @@index([processed])
   @@index([specialistCrm])
+}
+
+// Sistema de Gamificação e Progresso
+model UserProgress {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  user            User     @relation(fields: [userId], references: [id])
+
+  // Pontuação
+  dailyPoints     Int      @default(0)
+  totalPoints     Int      @default(0)
+
+  // Streaks
+  currentStreak   Int      @default(0)
+  longestStreak   Int      @default(0)
+  lastActivityDate DateTime?
+
+  // Estatísticas
+  totalTips       Int      @default(0)
+  totalReminders  Int      @default(0)
+
+  // Nível e conquistas
+  level           Int      @default(1)
+  experience      Int      @default(0)
+  badges          String[] // Array de badges conquistadas
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([totalPoints])
+  @@index([level])
+}
+
+
+
+model UserPoints {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+
+  activityType    String   // 'exercise', 'tip', 'reminder', 'streak_bonus'
+  activityName    String?  // Nome específico da atividade
+  points          Int      // Pontos ganhos
+  description     String   // Descrição da atividade
+
+  // Metadados
+  metadata        Json?    // Dados adicionais (streak, duração, etc.)
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+}
+
+// Sistema de Lembretes e Notificações
+model Reminder {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+
+  type            String   // 'exercise', 'tip', 'checkup', 'medication'
+  title           String
+  message         String
+
+  // Configurações de agendamento
+  frequency       String   // 'daily', 'weekly', 'monthly', 'custom'
+  time            String   // Horário no formato HH:mm
+  days            String[] // Dias da semana (para weekly) ou datas específicas
+
+  // Status
+  isActive        Boolean  @default(true)
+  lastSent        DateTime?
+  nextScheduled   DateTime?
+
+  // Configurações de notificação
+  notifyEmail     Boolean  @default(false)
+  notifyPush      Boolean  @default(true)
+  notifyInApp     Boolean  @default(true)
+
+  // Metadados
+  metadata        Json?    // Dados específicos do lembrete
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([isActive])
+  @@index([nextScheduled])
+}
+
+model NotificationLog {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  reminderId      Int?
+
+  type            String   // 'reminder', 'achievement', 'streak', 'tip'
+  title           String
+  message         String
+
+  // Status de entrega
+  sent            Boolean  @default(false)
+  sentAt          DateTime?
+  delivered       Boolean  @default(false)
+  deliveredAt     DateTime?
+  read            Boolean  @default(false)
+  readAt          DateTime?
+
+  // Canal de notificação
+  channel         String   // 'email', 'push', 'in_app'
+
+  // Metadados
+  metadata        Json?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([sent])
+  @@index([read])
+  @@index([createdAt])
 }
 

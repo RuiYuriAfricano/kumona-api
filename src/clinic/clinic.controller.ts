@@ -123,6 +123,75 @@ export class ClinicController {
     return this.clinicService.getPatients(req.user.id, page, limit, search);
   }
 
+  @Get('selected-users')
+  @ApiOperation({ summary: 'Listar usuários que selecionaram esta clínica para acompanhamento' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Número da página (padrão: 1)'
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Itens por página (padrão: 10)'
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Buscar por nome ou email'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de usuários retornada com sucesso'
+  })
+  async getSelectedUsers(
+    @Request() req,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('search') search?: string
+  ) {
+    return this.clinicService.getSelectedUsers(req.user.id, page, limit, search);
+  }
+
+  @Get('selected-users/:userId/diagnoses')
+  @ApiOperation({ summary: 'Obter histórico de diagnósticos de um usuário que selecionou a clínica' })
+  @ApiParam({
+    name: 'userId',
+    description: 'ID do usuário',
+    type: 'number'
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Número da página (padrão: 1)'
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Itens por página (padrão: 10)'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Histórico de diagnósticos retornado com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Usuário não encontrado ou não selecionou esta clínica'
+  })
+  async getUserDiagnoses(
+    @Request() req,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number
+  ) {
+    return this.clinicService.getUserDiagnoses(req.user.id, userId, page, limit);
+  }
+
   @Get('patients/:id')
   @ApiOperation({ summary: 'Obter detalhes de um paciente específico' })
   @ApiParam({
@@ -437,5 +506,24 @@ export class ClinicController {
   })
   async getFeedbackStats(@Request() req) {
     return this.specialistFeedbackService.getFeedbackStats(req.user.id);
+  }
+
+  // === ENDPOINTS DE REGISTRO DE USUÁRIOS ===
+
+  @Post('register-user')
+  @ApiOperation({ summary: 'Registrar novo usuário pela clínica' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Usuário registrado com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Email já cadastrado'
+  })
+  async registerUser(
+    @Request() req,
+    @Body() userData: { name: string; email: string; phone?: string }
+  ) {
+    return this.clinicService.registerUser(req.user.id, userData);
   }
 }

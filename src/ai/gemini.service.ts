@@ -46,7 +46,7 @@ export class GeminiService {
   constructor(private configService: ConfigService) {
     // Usar API key do Gemini do arquivo .env
     this.apiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
-    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
     this.isEnabled = !!this.apiKey;
 
     if (this.isEnabled) {
@@ -89,7 +89,7 @@ export class GeminiService {
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096, // Aumentado para evitar truncamento
           }
         },
         {
@@ -100,12 +100,66 @@ export class GeminiService {
         }
       );
 
-      let content = response.data.candidates[0].content.parts[0].text;
+      // Verificar se a resposta tem a estrutura esperada
+      if (!response.data?.candidates?.[0]) {
+        this.logger.error('Resposta do Gemini sem estrutura esperada:', JSON.stringify(response.data, null, 2));
+        throw new Error('Resposta inválida do Gemini - estrutura inesperada');
+      }
+
+      const candidate = response.data.candidates[0];
+
+      // Verificar se a resposta foi truncada por MAX_TOKENS
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        this.logger.warn('⚠️ [Gemini] Resposta truncada por MAX_TOKENS, tentando processar conteúdo parcial');
+      }
+
+      // Verificar se há conteúdo disponível
+      if (!candidate.content?.parts?.[0]?.text) {
+        this.logger.error('Resposta do Gemini sem conteúdo de texto:', JSON.stringify(response.data, null, 2));
+        throw new Error('Resposta inválida do Gemini - sem conteúdo de texto');
+      }
+
+      let content = candidate.content.parts[0].text;
+      this.logger.debug(`Conteúdo bruto do Gemini (dicas): ${content.substring(0, 200)}...`);
 
       // Limpar markdown se presente (```json ... ```)
       content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
 
-      const parsedResponse = JSON.parse(content);
+      // Extrair JSON válido da resposta
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        this.logger.error('Conteúdo da resposta do Gemini (dicas):', content);
+        throw new Error('Nenhum JSON válido encontrado na resposta');
+      }
+
+      let parsedResponse: any;
+      try {
+        // Tentar limpar JSON malformado
+        let cleanJson = jsonMatch[0];
+        // Remover vírgulas extras antes de } ou ]
+        cleanJson = cleanJson.replace(/,(\s*[}\]])/g, '$1');
+        // Remover quebras de linha dentro de strings
+        cleanJson = cleanJson.replace(/\n/g, ' ');
+
+        parsedResponse = JSON.parse(cleanJson);
+      } catch (parseError) {
+        this.logger.error('Erro ao fazer parse do JSON do Gemini (dicas):', parseError);
+        this.logger.error('JSON problemático:', jsonMatch[0]);
+
+        // Se foi truncado por MAX_TOKENS, tentar usar fallback
+        if (candidate.finishReason === 'MAX_TOKENS') {
+          this.logger.warn('⚠️ [Gemini] JSON truncado por MAX_TOKENS, usando fallback');
+          throw new Error('Resposta truncada do Gemini - usando fallback');
+        }
+
+        throw new Error(`Erro no parse JSON: ${parseError.message}`);
+      }
+
+      // Verificar se a resposta tem a estrutura esperada
+      if (!parsedResponse.tips || !Array.isArray(parsedResponse.tips)) {
+        this.logger.error('Resposta do Gemini sem array de dicas:', parsedResponse);
+        throw new Error('Resposta inválida do Gemini - sem array de dicas');
+      }
 
       this.logger.log(`✅ [Gemini] ${parsedResponse.tips.length} dicas geradas com sucesso para ${userProfile.name}`);
       return parsedResponse.tips;
@@ -142,7 +196,7 @@ export class GeminiService {
             temperature: 0.6,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1500,
+            maxOutputTokens: 3072, // Aumentado para evitar truncamento
           }
         },
         {
@@ -153,12 +207,72 @@ export class GeminiService {
         }
       );
 
-      let content = response.data.candidates[0].content.parts[0].text;
+      // Verificar se a resposta tem a estrutura esperada
+      if (!response.data?.candidates?.[0]) {
+        this.logger.error('Resposta do Gemini sem estrutura esperada:', JSON.stringify(response.data, null, 2));
+        throw new Error('Resposta inválida do Gemini - estrutura inesperada');
+      }
+
+      const candidate = response.data.candidates[0];
+
+      // Verificar se a resposta foi truncada por MAX_TOKENS
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        this.logger.warn('⚠️ [Gemini] Resposta truncada por MAX_TOKENS, tentando processar conteúdo parcial');
+      }
+
+      // Verificar se há conteúdo disponível
+      if (!candidate.content?.parts?.[0]?.text) {
+        this.logger.error('Resposta do Gemini sem conteúdo de texto:', JSON.stringify(response.data, null, 2));
+        throw new Error('Resposta inválida do Gemini - sem conteúdo de texto');
+      }
+
+      let content = candidate.content.parts[0].text;
+      this.logger.debug(`Conteúdo bruto do Gemini (exercícios): ${content.substring(0, 200)}...`);
 
       // Limpar markdown se presente (```json ... ```)
       content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
 
-      const parsedResponse = JSON.parse(content);
+      // Extrair JSON válido da resposta
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        this.logger.error('Conteúdo da resposta do Gemini (exercícios):', content);
+        throw new Error('Nenhum JSON válido encontrado na resposta');
+      }
+
+      let parsedResponse: any;
+      try {
+        // Tentar limpar JSON malformado
+        let cleanJson = jsonMatch[0];
+
+        // Remover vírgulas extras antes de fechamento de arrays/objetos
+        cleanJson = cleanJson.replace(/,(\s*[}\]])/g, '$1');
+        // Remover quebras de linha dentro de strings
+        cleanJson = cleanJson.replace(/\n/g, ' ');
+        // Remover caracteres de controle
+        cleanJson = cleanJson.replace(/[\x00-\x1F\x7F]/g, '');
+
+        // Tentar fazer parse
+        parsedResponse = JSON.parse(cleanJson);
+      } catch (parseError) {
+        this.logger.error('Erro ao fazer parse do JSON (exercícios):', jsonMatch[0]);
+
+        // Fallback mais robusto: criar exercício básico
+        this.logger.warn('Usando fallback para exercícios devido a erro de parse JSON');
+        const fallbackExercise = {
+          title: "Exercício de Relaxamento Ocular",
+          description: "Exercício básico para relaxar os olhos e reduzir a fadiga visual",
+          instructions: [
+            "Sente-se confortavelmente em uma cadeira",
+            "Feche os olhos suavemente por 10 segundos",
+            "Abra os olhos e pisque várias vezes",
+            "Olhe para um ponto distante por 10 segundos",
+            "Repita o processo 3 vezes"
+          ],
+          duration: 3,
+          category: "relaxation"
+        };
+        parsedResponse = { exercises: [fallbackExercise] };
+      }
 
       this.logger.log(`✅ [Gemini] ${parsedResponse.exercises.length} exercícios gerados com sucesso para ${userProfile.name}`);
       return parsedResponse.exercises;

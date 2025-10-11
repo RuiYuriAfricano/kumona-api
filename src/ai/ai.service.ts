@@ -69,9 +69,9 @@ export class AiService {
         name: 'Custom Medical AI',
         url: this.configService.get<string>('ai.custom.url'),
         apiKey: this.configService.get<string>('ai.custom.apiKey'),
-        enabled: !!this.configService.get<string>('ai.custom.apiKey'),
+        enabled: !!this.configService.get<string>('ai.custom.url'), // Habilitar se URL estiver configurada
         timeout: 35000,
-        priority: 4,
+        priority: 1, // Prioridade mais alta para usar o modelo treinado primeiro
       }
     ]
     .filter(provider => provider.enabled)
@@ -296,7 +296,7 @@ export class AiService {
     }
 
     const condition = classMapping[data.predicted_class] || data.predicted_class;
-    const score = Math.round((1 - confidence) * 100); // Inverter para score de risco
+    const score = Math.round(confidence * 100); // Confidence em porcentagem
 
     // Gerar recomendações baseadas na condição detectada
     let recommendations = [];
@@ -499,5 +499,114 @@ export class AiService {
   // Método público para verificar se está usando simulação
   isUsingSimulation(): boolean {
     return this.providers.length === 0 || (this.isDevelopment && this.fallbackToSimulation);
+  }
+
+  // Validar se a imagem é de fundoscopia usando Gemini
+  async validateFundoscopyImage(base64Image: string): Promise<{
+    isValid: boolean;
+    reason: string;
+    confidence: number;
+  }> {
+    try {
+      this.logger.log('Validando imagem de fundoscopia com Gemini');
+
+      // Configuração do Gemini para validação
+      const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
+
+      if (!geminiApiKey) {
+        this.logger.warn('GEMINI_API_KEY não configurada, permitindo imagem');
+        return {
+          isValid: true,
+          reason: 'Validação não disponível',
+          confidence: 0
+        };
+      }
+
+      const prompt = `
+        Analise esta imagem e determine se é uma imagem de fundoscopia (exame do fundo do olho).
+
+        Uma imagem de fundoscopia deve mostrar:
+        - O disco óptico (nervo óptico)
+        - Vasos sanguíneos da retina
+        - A mácula
+        - Fundo avermelhado/alaranjado típico da retina
+
+        Responda APENAS no formato JSON:
+        {
+          "isValid": true/false,
+          "reason": "explicação breve",
+          "confidence": 0.0-1.0
+        }
+      `;
+
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+        {
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: base64Image
+                }
+              }
+            ]
+          }]
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000
+        }
+      );
+
+      const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!result) {
+        throw new Error('Resposta inválida do Gemini');
+      }
+
+      // Extrair JSON da resposta
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('JSON não encontrado na resposta');
+      }
+
+      const validation = JSON.parse(jsonMatch[0]);
+
+      this.logger.log('Validação de fundoscopia concluída', {
+        isValid: validation.isValid,
+        confidence: validation.confidence,
+        reason: validation.reason
+      });
+
+      return {
+        isValid: validation.isValid || false,
+        reason: validation.reason || 'Análise inconclusiva',
+        confidence: validation.confidence || 0
+      };
+
+    } catch (error) {
+      this.logger.error('Erro na validação de fundoscopia com Gemini', error);
+
+      // Verificar se é erro de quota
+      if (error.response?.status === 429) {
+        this.logger.warn('Quota do Gemini excedida, pulando validação de fundoscopia');
+        return {
+          isValid: true,
+          reason: 'Validação indisponível (quota excedida), prosseguindo com análise',
+          confidence: 0
+        };
+      }
+
+      // Em caso de outros erros, permitir prosseguir
+      return {
+        isValid: true,
+        reason: 'Erro na validação, prosseguindo com análise',
+        confidence: 0
+      };
+    }
   }
 }

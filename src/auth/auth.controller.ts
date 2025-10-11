@@ -1,5 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { Controller, Post, Body, HttpCode, HttpStatus, Req, BadRequestException, UseGuards, Patch } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -7,6 +7,8 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { GetUser } from '../common/decorators/get-user.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -118,5 +120,20 @@ export class AuthController {
     }
 
     return this.authService.googleCallback(body.code);
+  }
+
+  @Patch('complete-first-login')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Marcar primeiro login como completo',
+    description: 'Marca que o usuário já completou o primeiro login e não deve mais ver a tela de boas-vindas'
+  })
+  @ApiResponse({ status: 200, description: 'Primeiro login marcado como completo' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  async completeFirstLogin(@GetUser() user: any) {
+    await this.authService.markFirstLoginComplete(user.id);
+    return { message: 'Primeiro login marcado como completo' };
   }
 }

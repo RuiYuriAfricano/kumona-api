@@ -66,6 +66,14 @@ export class UserService {
     return result;
   }
 
+  async markFirstLoginComplete(id: number) {
+    await this.getUserById(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { isFirstLogin: false },
+    });
+  }
+
   async updateUser(id: number, data: UpdateUserDto) {
     await this.getUserById(id);
 
@@ -123,6 +131,29 @@ export class UserService {
     return this.prisma.user.update({
       where: { id },
       data: { deleted: true },
+    });
+  }
+
+  async selectClinic(userId: number, clinicId: number) {
+    // Verificar se o usuário existe
+    await this.getUserById(userId);
+
+    // Verificar se a clínica existe e está aprovada
+    const clinic = await this.prisma.clinic.findFirst({
+      where: {
+        id: clinicId,
+        status: 'APPROVED'
+      }
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clínica não encontrada ou não aprovada');
+    }
+
+    // Atualizar o usuário com a clínica selecionada
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { selectedClinicId: clinicId },
     });
   }
 }

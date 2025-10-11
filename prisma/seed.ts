@@ -19,7 +19,7 @@ async function main() {
   // await prisma.medicalHistory.deleteMany();
   // await prisma.user.deleteMany();
   // await prisma.preventionTip.deleteMany();
-  // await prisma.eyeExercise.deleteMany();
+
 
   // Criar usuários de exemplo
   const hashedPassword = await bcrypt.hash('123456', 10);
@@ -103,14 +103,16 @@ async function main() {
   });
 
   // 4. CRIAR CLÍNICAS
-  const clinic1 = await prisma.clinic.create({
-    data: {
+  const clinic1 = await prisma.clinic.upsert({
+    where: { nif: '1234567890' },
+    update: {},
+    create: {
       name: 'Clínica Visão Clara',
-      cnpj: '12.345.678/0001-90',
-      address: 'Rua das Flores, 123',
+      nif: '1234567890',
+      address: 'Rua das Flores, 123, Maianga',
       city: 'Luanda',
       state: 'LU',
-      zipCode: '10000-000',
+      zipCode: 'CP 1234',
       phone: '(244) 933-111-222',
       email: 'contato@visaoclara.ao',
       website: 'https://visaoclara.ao',
@@ -118,22 +120,24 @@ async function main() {
       description: 'Clínica especializada em cuidados oftalmológicos com tecnologia de ponta.',
       status: ClinicStatus.APPROVED,
       responsibleName: 'Dr. Carlos Mendes',
-      responsibleCpf: '123.456.789-01',
-      responsibleCrm: 'CRM-AO 12345',
+      responsibleBi: '123456789AB123',
+      responsibleOrmed: 'ORMED-12345',
       userId: clinicUser1.id,
       approvedBy: adminUser.id,
       approvedAt: new Date(),
     },
   });
 
-  const clinic2 = await prisma.clinic.create({
-    data: {
+  const clinic2 = await prisma.clinic.upsert({
+    where: { nif: '9876543210' },
+    update: {},
+    create: {
       name: 'Centro Oftálmico de Angola',
-      cnpj: '98.765.432/0001-10',
-      address: 'Avenida Principal, 456',
+      nif: '9876543210',
+      address: 'Avenida Norton de Matos, 456, Centro',
       city: 'Benguela',
       state: 'BE',
-      zipCode: '20000-000',
+      zipCode: 'CP 5678',
       phone: '(244) 944-333-444',
       email: 'info@centrooftalmico.ao',
       website: 'https://centrooftalmico.ao',
@@ -141,8 +145,8 @@ async function main() {
       description: 'Centro especializado em diagnóstico e tratamento de doenças oculares.',
       status: ClinicStatus.APPROVED,
       responsibleName: 'Dra. Ana Ferreira',
-      responsibleCpf: '987.654.321-09',
-      responsibleCrm: 'CRM-AO 67890',
+      responsibleBi: '987654321CD456',
+      responsibleOrmed: 'ORMED-67890',
       userId: clinicUser2.id,
       approvedBy: adminUser.id,
       approvedAt: new Date(),
@@ -150,8 +154,10 @@ async function main() {
   });
 
   // Clínica pendente de aprovação
-  const clinicUser3 = await prisma.user.create({
-    data: {
+  const clinicUser3 = await prisma.user.upsert({
+    where: { email: 'clinica.nova@example.com' },
+    update: {},
+    create: {
       name: 'Dr. Pedro Costa',
       email: 'clinica.nova@example.com',
       password: hashedPassword,
@@ -163,22 +169,24 @@ async function main() {
     },
   });
 
-  const clinic3 = await prisma.clinic.create({
-    data: {
+  const clinic3 = await prisma.clinic.upsert({
+    where: { nif: '1122233344' },
+    update: {},
+    create: {
       name: 'Clínica Olhar Novo',
-      cnpj: '11.222.333/0001-44',
-      address: 'Rua da Esperança, 789',
+      nif: '1122233344',
+      address: 'Rua da Esperança, 789, Huambo',
       city: 'Huambo',
       state: 'HU',
-      zipCode: '30000-000',
+      zipCode: 'CP 9101',
       phone: '(244) 955-666-777',
       email: 'contato@olharnovo.ao',
       specialties: ['Oftalmologia Geral', 'Pediatria Oftálmica'],
       description: 'Nova clínica focada em atendimento oftalmológico de qualidade.',
       status: ClinicStatus.PENDING,
       responsibleName: 'Dr. Pedro Costa',
-      responsibleCpf: '111.222.333-44',
-      responsibleCrm: 'CRM-AO 11111',
+      responsibleBi: '111222333EF789',
+      responsibleOrmed: 'ORMED-11111',
       userId: clinicUser3.id,
     },
   });
@@ -212,7 +220,7 @@ async function main() {
       name: 'José Manuel',
       email: 'jose.manuel@email.com',
       phone: '(244) 911-222-333',
-      cpf: '123.456.789-10',
+      bi: '123456789AB123',
       birthDate: new Date('1965-04-12'),
       gender: 'M',
       address: 'Rua A, 100',
@@ -232,7 +240,7 @@ async function main() {
       name: 'Ana Beatriz',
       email: 'ana.beatriz@email.com',
       phone: '(244) 922-333-444',
-      cpf: '987.654.321-10',
+      bi: '987654321CD456',
       birthDate: new Date('1992-08-30'),
       gender: 'F',
       address: 'Avenida B, 200',
@@ -252,7 +260,7 @@ async function main() {
       name: 'Carlos Alberto',
       email: 'carlos.alberto@email.com',
       phone: '(244) 933-444-555',
-      cpf: '456.789.123-10',
+      bi: '456789123EF789',
       birthDate: new Date('1958-12-05'),
       gender: 'M',
       address: 'Rua C, 300',
@@ -272,7 +280,7 @@ async function main() {
       name: 'Mariana Silva',
       email: 'mariana.silva@email.com',
       phone: '(244) 944-555-666',
-      cpf: '789.123.456-10',
+      bi: '789123456GH012',
       birthDate: new Date('1988-06-15'),
       gender: 'F',
       address: 'Avenida D, 400',
@@ -350,56 +358,7 @@ async function main() {
     });
   }
 
-  // Criar exercícios oculares
-  const eyeExercises = [
-    {
-      title: 'Exercício de Foco',
-      description: 'Alterne o foco entre objetos próximos e distantes para fortalecer os músculos oculares.',
-      instructions: [
-        'Segure o dedo a 15cm do rosto',
-        'Foque no dedo por 3 segundos',
-        'Mude o foco para um objeto distante',
-        'Mantenha o foco por 3 segundos',
-        'Repita 10 vezes'
-      ],
-      duration: 5,
-      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=300&h=200&fit=crop',
-    },
-    {
-      title: 'Movimento Circular',
-      description: 'Mova os olhos em círculos para relaxar e fortalecer os músculos oculares.',
-      instructions: [
-        'Feche os olhos suavemente',
-        'Mova os olhos em círculos lentos no sentido horário',
-        'Faça 5 círculos completos',
-        'Mude para o sentido anti-horário',
-        'Faça mais 5 círculos',
-        'Abra os olhos e relaxe'
-      ],
-      duration: 3,
-      imageUrl: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=200&fit=crop',
-    },
-    {
-      title: 'Piscada Consciente',
-      description: 'Exercício de piscada para lubrificar os olhos e reduzir o ressecamento.',
-      instructions: [
-        'Sente-se confortavelmente',
-        'Pisque normalmente 5 vezes',
-        'Feche os olhos firmemente por 2 segundos',
-        'Abra e pisque rapidamente 10 vezes',
-        'Relaxe por 5 segundos',
-        'Repita o ciclo 3 vezes'
-      ],
-      duration: 2,
-      imageUrl: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=300&h=200&fit=crop',
-    },
-  ];
 
-  for (const exerciseData of eyeExercises) {
-    await prisma.eyeExercise.create({
-      data: exerciseData,
-    });
-  }
 
   // 6. CRIAR DIAGNÓSTICOS DE PACIENTES DAS CLÍNICAS
   const patientDiagnosis1 = await prisma.patientDiagnosis.create({
@@ -694,7 +653,7 @@ async function main() {
   console.log(`   ⚙️ Preferências: 2`);
   console.log(`   🔍 Diagnósticos regulares: 3`);
   console.log(`   💡 Dicas de prevenção: ${preventionTips.length}`);
-  console.log(`   👁️ Exercícios oculares: ${eyeExercises.length}`);
+
   console.log(`   🏃‍♂️ Atividades de prevenção: ${preventionActivities.length}`);
   console.log(`   🔔 Notificações: ${notifications.length}`);
   console.log('');

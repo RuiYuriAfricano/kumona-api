@@ -45,7 +45,7 @@ export class AdminService {
 
     // Verificar se CNPJ já existe
     const existingClinic = await this.prisma.clinic.findUnique({
-      where: { cnpj: createClinicDto.cnpj }
+      where: { nif: createClinicDto.nif }
     });
 
     if (existingClinic) {

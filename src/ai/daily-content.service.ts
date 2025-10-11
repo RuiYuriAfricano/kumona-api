@@ -15,10 +15,11 @@ export class DailyContentService {
   /**
    * Gera conteúdo diário para todos os usuários ativos
    * Executa todos os dias às 6:00 AM
+   * Agora com controle inteligente para evitar regenerações desnecessárias
    */
   @Cron(CronExpression.EVERY_DAY_AT_6AM)
   async generateDailyContentForAllUsers() {
-    this.logger.log('🕕 [DailyContent] Iniciando geração de conteúdo diário para todos os usuários');
+    this.logger.log('🕕 [DailyContent] Iniciando geração de conteúdo diário para todos os usuários (com cache inteligente)');
 
     try {
       // Buscar todos os usuários ativos que têm pelo menos um diagnóstico
@@ -73,8 +74,7 @@ export class DailyContentService {
       // Gerar dicas personalizadas (10 por dia)
       await this.personalizedContentService.generateDailyTips(userId);
 
-      // Gerar exercícios personalizados (3 por dia)
-      await this.personalizedContentService.generateDailyExercises(userId);
+
 
       this.logger.log(`✅ [DailyContent] Conteúdo diário gerado com sucesso para usuário ${userId}`);
 
@@ -106,17 +106,7 @@ export class DailyContentService {
         }
       });
 
-      // Limpar exercícios antigos
-      const deletedExercises = await this.prisma.userExercise.deleteMany({
-        where: {
-          display: false,
-          createdAt: {
-            lt: sevenDaysAgo
-          }
-        }
-      });
-
-      this.logger.log(`🗑️ [DailyContent] Limpeza concluída: ${deletedTips.count} dicas e ${deletedExercises.count} exercícios removidos`);
+      this.logger.log(`🗑️ [DailyContent] Limpeza concluída: ${deletedTips.count} dicas removidas`);
 
     } catch (error) {
       this.logger.error('💥 [DailyContent] Erro na limpeza de conteúdo antigo:', error);
@@ -156,7 +146,7 @@ export class DailyContentService {
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       // Contar conteúdo gerado hoje
-      const [tipsToday, exercisesToday, totalUsers, activeUsers] = await Promise.all([
+      const [tipsToday, totalUsers, activeUsers] = await Promise.all([
         this.prisma.userTip.count({
           where: {
             createdAt: {
@@ -165,14 +155,7 @@ export class DailyContentService {
             }
           }
         }),
-        this.prisma.userExercise.count({
-          where: {
-            createdAt: {
-              gte: today,
-              lt: tomorrow
-            }
-          }
-        }),
+
         this.prisma.user.count({
           where: { deleted: false }
         }),
@@ -189,7 +172,6 @@ export class DailyContentService {
       return {
         today: {
           tipsGenerated: tipsToday,
-          exercisesGenerated: exercisesToday,
           date: today.toISOString().split('T')[0]
         },
         users: {
@@ -217,9 +199,6 @@ export class DailyContentService {
       // Desativar todo o conteúdo atual
       await Promise.all([
         this.prisma.userTip.updateMany({
-          data: { display: false }
-        }),
-        this.prisma.userExercise.updateMany({
           data: { display: false }
         })
       ]);

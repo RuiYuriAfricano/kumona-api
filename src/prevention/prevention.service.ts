@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PersonalizedContentService } from '../ai/personalized-content.service';
+import { GamificationService } from '../gamification/gamification.service';
+import { NotificationService } from '../notifications/notification.service';
 import { CreatePreventionActivityDto } from './dto/create-prevention-activity.dto';
 import { PreventionActivityDto } from './dto/prevention-activity.dto';
 import { PreventionTipDto } from './dto/prevention-tip.dto';
@@ -9,9 +11,13 @@ import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class PreventionService {
+  private readonly logger = new Logger(PreventionService.name);
+
   constructor(
     private prisma: PrismaService,
-    private personalizedContentService: PersonalizedContentService
+    private personalizedContentService: PersonalizedContentService,
+    private gamificationService: GamificationService,
+    private notificationService: NotificationService,
   ) {}
 
   async getPreventionTips(userId: number, category?: string, limit = 10): Promise<PreventionTipDto[]> {
@@ -36,23 +42,7 @@ export class PreventionService {
     });
   }
 
-  async getEyeExercises(userId: number): Promise<EyeExerciseDto[]> {
-    // Para novos usuários, sempre retornar array vazio
-    // Só mostrar exercícios após o usuário fazer pelo menos um diagnóstico
-    const userDiagnoses = await this.prisma.diagnosis.count({
-      where: { userId }
-    });
 
-    if (userDiagnoses === 0) {
-      return [];
-    }
-
-    return this.prisma.eyeExercise.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
 
   async getPreventionTipById(id: number): Promise<PreventionTipDto> {
     const tip = await this.prisma.preventionTip.findUnique({
@@ -66,17 +56,7 @@ export class PreventionService {
     return tip;
   }
 
-  async getEyeExerciseById(id: number): Promise<EyeExerciseDto> {
-    const exercise = await this.prisma.eyeExercise.findUnique({
-      where: { id },
-    });
 
-    if (!exercise) {
-      throw new Error('Exercício não encontrado');
-    }
-
-    return exercise;
-  }
 
   async debugUserStatus(userId: number) {
     const userDiagnoses = await this.prisma.diagnosis.count({
@@ -88,16 +68,14 @@ export class PreventionService {
     });
 
     const totalTips = await this.prisma.preventionTip.count();
-    const totalExercises = await this.prisma.eyeExercise.count();
+
 
     return {
       userId,
       diagnosesCount: userDiagnoses,
       activitiesCount: userActivities,
       totalTipsInDatabase: totalTips,
-      totalExercisesInDatabase: totalExercises,
-      shouldShowTips: userDiagnoses > 0,
-      shouldShowExercises: userDiagnoses > 0
+      shouldShowTips: userDiagnoses > 0
     };
   }
 
@@ -132,36 +110,7 @@ export class PreventionService {
     return personalizedTips;
   }
 
-  async getUserExercises(userId: number): Promise<EyeExerciseDto[]> {
-    // Verificar se o usuário tem diagnósticos
-    const userDiagnoses = await this.prisma.diagnosis.count({
-      where: { userId }
-    });
 
-    console.log(`[getUserExercises] UserId: ${userId}, Diagnoses: ${userDiagnoses}`);
-
-    if (userDiagnoses === 0) {
-      console.log(`[getUserExercises] Usuário ${userId} não tem diagnósticos - retornando array vazio`);
-      return [];
-    }
-
-    // Verificar se há exercícios personalizados ativos para hoje
-    const personalizedExercises = await this.personalizedContentService.getDailyExercises(userId);
-
-    if (personalizedExercises.length === 0) {
-      // Gerar exercícios personalizados se não existirem
-      console.log(`[getUserExercises] Gerando exercícios personalizados para usuário ${userId}`);
-      await this.personalizedContentService.generateDailyExercises(userId);
-
-      // Buscar os exercícios recém-gerados
-      const newExercises = await this.personalizedContentService.getDailyExercises(userId);
-      console.log(`[getUserExercises] ${newExercises.length} exercícios personalizados gerados para usuário ${userId}`);
-      return newExercises;
-    }
-
-    console.log(`[getUserExercises] Retornando ${personalizedExercises.length} exercícios personalizados para usuário ${userId}`);
-    return personalizedExercises;
-  }
 
   async getUserSavedTips(userId: number) {
     console.log(`[getUserSavedTips] Buscando dicas salvas para usuário ${userId}`);
@@ -180,7 +129,11 @@ export class PreventionService {
     return this.personalizedContentService.unsaveTip(userId, tipId, tipType);
   }
 
-  async trackPreventionActivity(userId: number, activityDto: CreatePreventionActivityDto): Promise<PreventionActivityDto> {
+
+
+  async trackPreventionActivity(userId: number, activityDto: CreatePreventionActivityDto): Promise<any> {
+    this.logger.log(`🎯 [Prevention] Rastreando atividade para usuário ${userId}: ${activityDto.type}`);
+
     // Verificar se o usuário existe
     const user = await this.prisma.user.findUnique({
       where: { id: userId, deleted: false },
@@ -195,18 +148,63 @@ export class PreventionService {
       throw new BadRequestException('Tipo de atividade inválido');
     }
 
-    // Criar a atividade de prevenção
-    const activity = await this.prisma.preventionActivity.create({
-      data: {
-        type: activityDto.type,
-        description: activityDto.description,
-        duration: activityDto.duration,
-        notes: activityDto.notes,
-        userId,
-      },
-    });
+    try {
+      // Criar a atividade de prevenção
+      const activity = await this.prisma.preventionActivity.create({
+        data: {
+          type: activityDto.type,
+          description: activityDto.description,
+          duration: activityDto.duration,
+          notes: activityDto.notes,
+          userId,
+        },
+      });
 
-    return activity;
+      // Mapear tipo de atividade para gamificação
+      let gamificationActivityType = activityDto.type;
+      let activityName = '';
+
+      // Usar o tipo original se disponível (mais preciso que parsing da descrição)
+      if (activityDto.originalActivityType) {
+        gamificationActivityType = activityDto.originalActivityType;
+        this.logger.log(`🎯 [Prevention] Usando tipo original: ${activityDto.originalActivityType}`);
+      }
+
+      // Extrair nome do exercício da descrição se possível
+      if (activityDto.description.includes('Exercício iniciado:')) {
+        if (!activityDto.originalActivityType) gamificationActivityType = 'start_exercise';
+        activityName = activityDto.description.replace('Exercício iniciado: ', '');
+      } else if (activityDto.description.includes('Exercício completado:')) {
+        if (!activityDto.originalActivityType) gamificationActivityType = 'complete_exercise';
+        activityName = activityDto.description.replace('Exercício completado: ', '');
+      } else if (activityDto.description.includes('Lembrete configurado')) {
+        if (!activityDto.originalActivityType) gamificationActivityType = 'set_reminder';
+      }
+
+      // Registrar atividade na gamificação
+      const gamificationResult = await this.gamificationService.recordActivity(userId, {
+        activityType: gamificationActivityType,
+        activityName: activityName || activityDto.description,
+        duration: activityDto.duration,
+        metadata: {
+          preventionActivityId: activity.id,
+          originalType: activityDto.type,
+          notes: activityDto.notes
+        }
+      });
+
+      this.logger.log(`✅ [Prevention] Atividade registrada com ${gamificationResult.totalPoints} pontos`);
+
+      // Retornar atividade com dados de gamificação
+      return {
+        ...activity,
+        gamification: gamificationResult
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ [Prevention] Erro ao rastrear atividade:`, error);
+      throw error;
+    }
   }
 
   async getPreventionActivities(
@@ -315,7 +313,7 @@ export class PreventionService {
   async seedInitialData() {
     // Verificar se já existem dados
     const tipsCount = await this.prisma.preventionTip.count();
-    const exercisesCount = await this.prisma.eyeExercise.count();
+
 
     if (tipsCount === 0) {
       // Criar dicas de prevenção
@@ -340,33 +338,6 @@ export class PreventionService {
       });
     }
 
-    if (exercisesCount === 0) {
-      // Criar exercícios oculares
-      await this.prisma.eyeExercise.createMany({
-        data: [
-          {
-            title: 'Palming',
-            description: 'Técnica de relaxamento ocular que ajuda a reduzir a tensão nos olhos.',
-            instructions: [
-              'Esfregue as mãos até ficarem quentes',
-              'Coloque as palmas das mãos sobre os olhos fechados',
-              'Respire profundamente e relaxe por 1-2 minutos',
-            ],
-            duration: 2,
-          },
-          {
-            title: 'Movimentos oculares',
-            description: 'Exercício para fortalecer os músculos dos olhos e melhorar a flexibilidade.',
-            instructions: [
-              'Mantenha a cabeça parada',
-              'Mova os olhos para cima e para baixo 10 vezes',
-              'Mova os olhos para a esquerda e direita 10 vezes',
-              'Mova os olhos em círculos 5 vezes em cada direção',
-            ],
-            duration: 3,
-          },
-        ],
-      });
-    }
+
   }
 }

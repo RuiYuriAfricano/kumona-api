@@ -9,9 +9,12 @@ import { PreventionModule } from './prevention/prevention.module';
 import { ProgressModule } from './progress/progress.module';
 import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { GamificationModule } from './gamification/gamification.module';
+import { NotificationModule } from './notifications/notification.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { AdminModule } from './admin/admin.module';
 import { ClinicModule } from './clinic/clinic.module';
+import { DoctorsModule } from './doctors/doctors.module';
 import { MLModule } from './ml/ml.module';
 import { HealthController } from './health.controller';
 import { AppModule as AppInfoModule } from './app/app.module';
@@ -33,9 +36,12 @@ import configuration from './config/configuration';
     ProgressModule,
     AiModule,
     NotificationsModule,
+    GamificationModule,
+    NotificationModule,
     WebsocketModule,
     AdminModule,
     ClinicModule,
+    DoctorsModule,
     MLModule,
     AppInfoModule,
     HelpModule,

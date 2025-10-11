@@ -35,4 +35,13 @@ export class CreatePreventionActivityDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({
+    description: 'Tipo original da atividade (antes do mapeamento)',
+    example: 'complete_exercise',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  originalActivityType?: string;
 }

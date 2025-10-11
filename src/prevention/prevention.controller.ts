@@ -24,7 +24,7 @@ import { PreventionService } from './prevention.service';
 import { CreatePreventionActivityDto } from './dto/create-prevention-activity.dto';
 import { PreventionActivityDto } from './dto/prevention-activity.dto';
 import { PreventionTipDto } from './dto/prevention-tip.dto';
-import { EyeExerciseDto } from './dto/eye-exercise.dto';
+
 import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 
 @ApiTags('prevention')
@@ -57,21 +57,7 @@ export class PreventionController {
     return this.preventionService.getPreventionTips(req.user.id, category, limit);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('exercises')
-  @ApiOperation({
-    summary: 'Obter exercícios oculares',
-    description: 'Retorna uma lista de exercícios oculares recomendados'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Exercícios oculares retornados com sucesso',
-    type: [EyeExerciseDto]
-  })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async getEyeExercises(@Request() req): Promise<EyeExerciseDto[]> {
-    return this.preventionService.getEyeExercises(req.user.id);
-  }
+
 
   @Get('tips/:id')
   @UseGuards(JwtAuthGuard)
@@ -83,15 +69,7 @@ export class PreventionController {
     return this.preventionService.getPreventionTipById(parseInt(id, 10));
   }
 
-  @Get('exercises/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Buscar exercício por ID' })
-  @ApiResponse({ status: 200, description: 'Exercício encontrado', type: EyeExerciseDto })
-  @ApiResponse({ status: 404, description: 'Exercício não encontrado' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async getEyeExerciseById(@Param('id') id: string): Promise<EyeExerciseDto> {
-    return this.preventionService.getEyeExerciseById(parseInt(id, 10));
-  }
+
 
   @UseGuards(JwtAuthGuard)
   @Post('track')
@@ -187,14 +165,25 @@ export class PreventionController {
     return this.preventionService.getUserPreventionTips(req.user.id);
   }
 
-  @Get('user/exercises')
+  @Get('user/tips/checksum')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Buscar exercícios do usuário' })
-  @ApiResponse({ status: 200, description: 'Exercícios do usuário encontrados', type: [EyeExerciseDto] })
+  @ApiOperation({ summary: 'Obter checksum das dicas do usuário para verificar mudanças' })
+  @ApiResponse({ status: 200, description: 'Checksum das dicas' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async getUserExercises(@Request() req): Promise<EyeExerciseDto[]> {
-    return this.preventionService.getUserExercises(req.user.id);
+  async getUserTipsChecksum(@Request() req) {
+    const tips = await this.preventionService.getUserPreventionTips(req.user.id);
+    const tipIds = tips.map(tip => tip.id).sort();
+    const checksum = Buffer.from(JSON.stringify(tipIds)).toString('base64');
+
+    return {
+      checksum,
+      count: tips.length,
+      tipIds,
+      timestamp: new Date().toISOString()
+    };
   }
+
+
 
   @Get('user/saved-tips')
   @UseGuards(JwtAuthGuard)
@@ -211,7 +200,39 @@ export class PreventionController {
   @ApiResponse({ status: 201, description: 'Dica salva com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async saveTip(@Request() req, @Body() body: { tipId: number; tipType: 'general' | 'personal' }) {
-    return this.preventionService.saveTip(req.user.id, body.tipId, body.tipType);
+    try {
+      console.log('🔍 [Controller] saveTip chamado:', {
+        userId: req.user?.id,
+        tipId: body.tipId,
+        tipType: body.tipType,
+        bodyKeys: Object.keys(body),
+        userKeys: Object.keys(req.user || {})
+      });
+
+      if (!req.user?.id) {
+        throw new Error('Usuário não encontrado na requisição');
+      }
+
+      if (!body.tipId) {
+        throw new Error('tipId é obrigatório');
+      }
+
+      if (!body.tipType) {
+        throw new Error('tipType é obrigatório');
+      }
+
+      const result = await this.preventionService.saveTip(req.user.id, body.tipId, body.tipType);
+      console.log('✅ [Controller] saveTip sucesso:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ [Controller] Erro em saveTip:', {
+        message: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        body: body
+      });
+      throw error;
+    }
   }
 
   @Delete('user/unsave-tip')
@@ -222,4 +243,6 @@ export class PreventionController {
   async unsaveTip(@Request() req, @Body() body: { tipId: number; tipType: 'general' | 'personal' }) {
     return this.preventionService.unsaveTip(req.user.id, body.tipId, body.tipType);
   }
+
+
 }

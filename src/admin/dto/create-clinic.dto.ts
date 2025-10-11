@@ -7,12 +7,12 @@ export class CreateClinicDto {
   @Length(2, 100)
   name: string;
 
-  @ApiProperty({ description: 'CNPJ da clínica' })
+  @ApiProperty({ description: 'NIF da clínica' })
   @IsString()
-  @Matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, {
-    message: 'CNPJ deve estar no formato XX.XXX.XXX/XXXX-XX'
+  @Matches(/^\d{10}$/, {
+    message: 'NIF deve conter 10 dígitos para pessoa coletiva'
   })
-  cnpj: string;
+  nif: string;
 
   @ApiProperty({ description: 'Endereço da clínica' })
   @IsString()
@@ -29,17 +29,15 @@ export class CreateClinicDto {
   @Length(2, 2)
   state: string;
 
-  @ApiProperty({ description: 'CEP' })
+  @ApiProperty({ description: 'Código Postal' })
   @IsString()
-  @Matches(/^\d{5}-?\d{3}$/, {
-    message: 'CEP deve estar no formato XXXXX-XXX'
-  })
+  @Length(5, 20)
   zipCode: string;
 
   @ApiProperty({ description: 'Telefone da clínica' })
   @IsString()
-  @Matches(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, {
-    message: 'Telefone deve estar no formato (XX) XXXXX-XXXX'
+  @Matches(/^\(\d{3}\)\s\d{3}-\d{3}-\d{3}$|^\+\d{3}\s\d{3}\s\d{3}\s\d{3}$/, {
+    message: 'Telefone deve estar no formato (244) XXX-XXX-XXX ou +244 XXX XXX XXX'
   })
   phone: string;
 
@@ -73,17 +71,20 @@ export class CreateClinicDto {
   @Length(2, 100)
   responsibleName: string;
 
-  @ApiProperty({ description: 'CPF do responsável' })
+  @ApiProperty({ description: 'BI do responsável' })
   @IsString()
-  @Matches(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, {
-    message: 'CPF deve estar no formato XXX.XXX.XXX-XX'
+  @Matches(/^\d{9}[A-Z]{2}\d{3}$/, {
+    message: 'BI deve estar no formato NNNNNNNNNLLNNN (9 números + 2 letras + 3 números)'
   })
-  responsibleCpf: string;
+  responsibleBi: string;
 
-  @ApiPropertyOptional({ description: 'CRM do médico responsável' })
+  @ApiPropertyOptional({ description: 'ORMED do médico responsável' })
   @IsOptional()
   @IsString()
-  responsibleCrm?: string;
+  @Matches(/^ORMED-\d{5}$/, {
+    message: 'ORMED deve estar no formato ORMED-XXXXX'
+  })
+  responsibleOrmed?: string;
 
   @ApiProperty({ description: 'ID do usuário que será associado à clínica' })
   userId: number;
