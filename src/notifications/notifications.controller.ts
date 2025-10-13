@@ -2,6 +2,7 @@ import { Controller, Get, Put, Post, Param, Body, UseGuards, Request, ParseIntPi
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
+import { DailyTipsService } from './daily-tips.service';
 import { NotificationDto } from './dto/notification.dto';
 import { ReadNotificationResponseDto } from './dto/read-notification.dto';
 import { ReadAllNotificationsResponseDto } from './dto/read-all-notifications.dto';
@@ -11,7 +12,10 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 @ApiBearerAuth()
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(
+    private notificationsService: NotificationsService,
+    private dailyTipsService: DailyTipsService
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -123,4 +127,22 @@ export class NotificationsController {
       createNotificationDto.type,
     );
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('daily-tip')
+  @ApiOperation({
+    summary: 'Solicitar dica diária',
+    description: 'Envia uma dica diária personalizada para o usuário'
+  })
+  @ApiResponse({ status: 201, description: 'Dica enviada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async sendDailyTip(@Request() req): Promise<{ success: boolean; message: string }> {
+    const success = await this.dailyTipsService.sendPersonalizedTip(req.user.id);
+    return {
+      success,
+      message: success ? 'Dica diária enviada com sucesso!' : 'Erro ao enviar dica diária'
+    };
+  }
+
+
 }

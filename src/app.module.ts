@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaService } from './prisma/prisma.service';
 import { UserModule } from './user/user.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -28,6 +29,7 @@ import configuration from './config/configuration';
       load: [configuration],
       envFilePath: ['.env', '.env.production', '.env.development', '.env.local'],
     }),
+    ScheduleModule.forRoot(),
     UserModule,
     PrismaModule,
     AuthModule,

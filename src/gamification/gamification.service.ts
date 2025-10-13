@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface ActivityData {
   activityType: string;
@@ -33,7 +34,10 @@ export interface UserProgressData {
 export class GamificationService {
   private readonly logger = new Logger(GamificationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService
+  ) {}
 
   /**
    * Calcula pontos baseado no tipo de atividade
@@ -221,6 +225,15 @@ export class GamificationService {
 
       this.logger.log(`✅ [Gamification] Usuário ${userId} ganhou ${totalActivityPoints} pontos (base: ${basePoints}, streak: ${streakBonus})`);
 
+      // Criar notificações para conquistas
+      await this.createAchievementNotifications(userId, {
+        points: totalActivityPoints,
+        leveledUp,
+        newLevel,
+        newBadges,
+        activityName: activityData.activityName
+      });
+
       return {
         points: basePoints,
         streakBonus,
@@ -235,7 +248,74 @@ export class GamificationService {
     }
   }
 
+  /**
+   * Criar notificações para conquistas do usuário
+   */
+  private async createAchievementNotifications(userId: number, achievements: {
+    points: number;
+    leveledUp: boolean;
+    newLevel?: number;
+    newBadges: string[];
+    activityName: string;
+  }): Promise<void> {
+    this.logger.log(`🎮 [Gamification] ===== CRIANDO NOTIFICAÇÕES DE CONQUISTA =====`);
+    this.logger.log(`🎮 [Gamification] UserId: ${userId}`);
+    this.logger.log(`🎮 [Gamification] Achievements:`, achievements);
 
+    try {
+      // Notificação de pontos ganhos
+      if (achievements.points > 0) {
+        this.logger.log(`🎮 [Gamification] Criando notificação de pontos: ${achievements.points}`);
+        await this.notificationsService.createNotification(
+          userId,
+          '🎯 Pontos Ganhos!',
+          `Parabéns! Você ganhou ${achievements.points} pontos com "${achievements.activityName}".`,
+          'success'
+        );
+        this.logger.log(`🎮 [Gamification] ✅ Notificação de pontos criada`);
+      }
+
+      // Notificação de novo nível
+      if (achievements.leveledUp && achievements.newLevel) {
+        this.logger.log(`🎮 [Gamification] Criando notificação de novo nível: ${achievements.newLevel}`);
+        await this.notificationsService.createNotification(
+          userId,
+          '🆙 Novo Nível Alcançado!',
+          `Incrível! Você alcançou o nível ${achievements.newLevel}! Continue assim!`,
+          'success'
+        );
+        this.logger.log(`🎮 [Gamification] ✅ Notificação de novo nível criada`);
+      }
+
+      // Notificações de novas badges
+      if (achievements.newBadges.length > 0) {
+        this.logger.log(`🎮 [Gamification] Criando notificações para ${achievements.newBadges.length} badges`);
+      }
+
+      for (const badge of achievements.newBadges) {
+        const badgeNames = {
+          'week_warrior': 'Guerreiro da Semana',
+          'month_master': 'Mestre do Mês',
+          'point_collector': 'Colecionador de Pontos'
+        };
+
+        const badgeName = badgeNames[badge] || badge;
+        this.logger.log(`🎮 [Gamification] Criando notificação para badge: ${badgeName}`);
+        await this.notificationsService.createNotification(
+          userId,
+          '🏆 Nova Conquista!',
+          `Você desbloqueou a conquista "${badgeName}"! Parabéns pela dedicação!`,
+          'success'
+        );
+        this.logger.log(`🎮 [Gamification] ✅ Notificação de badge criada: ${badgeName}`);
+      }
+
+      this.logger.log(`🎮 [Gamification] ===== NOTIFICAÇÕES DE CONQUISTA PROCESSADAS =====`);
+
+    } catch (error) {
+      this.logger.error(`❌ [Gamification] Erro ao criar notificações de conquista para usuário ${userId}:`, error);
+    }
+  }
 
   /**
    * Gera descrição da atividade

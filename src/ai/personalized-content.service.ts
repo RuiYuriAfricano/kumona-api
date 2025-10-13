@@ -6,6 +6,7 @@ import { GeminiService } from './gemini.service';
 interface UserProfile {
   id: number;
   name: string;
+  email?: string;
   birthDate: Date;
   medicalHistory?: {
     existingConditions: string[];
@@ -313,7 +314,7 @@ export class PersonalizedContentService {
     return {
       id: userProfile.id.toString(),
       name: userProfile.name,
-      email: `user${userProfile.id}@kumona.app`, // Email fictício baseado no ID
+      email: userProfile.email || `${userProfile.name.toLowerCase().replace(/\s+/g, '.')}@kumona.app`, // Email real ou baseado no nome
       birthDate: userProfile.birthDate,
       medicalHistory: {
         existingConditions: userProfile.medicalHistory?.existingConditions || [],

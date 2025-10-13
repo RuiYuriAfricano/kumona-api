@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dtos/update-user.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService
+  ) {}
 
   async getAllUsers() {
     return this.prisma.user.findMany({
@@ -121,6 +126,18 @@ export class UserService {
       },
     });
 
+    // Criar notificação de perfil atualizado
+    try {
+      await this.notificationsService.createNotification(
+        id,
+        '✅ Perfil Atualizado',
+        'Suas informações de perfil foram atualizadas com sucesso. Mantenha seus dados sempre atualizados para uma melhor experiência.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de perfil atualizado:', error);
+    }
+
     // Remover a senha do objeto de retorno
     const { password, ...result } = user;
     return result;
@@ -151,9 +168,23 @@ export class UserService {
     }
 
     // Atualizar o usuário com a clínica selecionada
-    return this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: { selectedClinicId: clinicId },
     });
+
+    // Criar notificação de clínica selecionada
+    try {
+      await this.notificationsService.createNotification(
+        userId,
+        '🏥 Clínica Selecionada',
+        `Você selecionou a clínica "${clinic.name}" com sucesso. Agora você pode agendar consultas e receber acompanhamento especializado.`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de clínica selecionada:', error);
+    }
+
+    return updatedUser;
   }
 }

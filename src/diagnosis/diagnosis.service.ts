@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { PersonalizedContentService } from '../ai/personalized-content.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import { NextSuggestionResponseDto } from './dto/next-suggestion.dto';
 import { UploadImageResponseDto } from './dto/upload-image.dto';
@@ -18,6 +19,8 @@ export class DiagnosisService {
     private prisma: PrismaService,
     private aiService: AiService,
     private personalizedContentService: PersonalizedContentService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async analyzeImage(userId: number, file: Express.Multer.File) {
@@ -68,6 +71,14 @@ export class DiagnosisService {
       });
 
       this.logger.log(`Diagnóstico criado com sucesso: ID ${diagnosis.id}`);
+
+      // Criar notificação de diagnóstico concluído
+      try {
+        await this.notificationsService.sendDiagnosisResultNotification(userId, diagnosis);
+      } catch (error) {
+        console.error('Erro ao criar notificação de diagnóstico:', error);
+      }
+
       return diagnosis;
     } catch (error) {
       this.logger.error(`Erro ao analisar imagem: ${error.message}`, error.stack);
@@ -235,6 +246,14 @@ export class DiagnosisService {
       });
 
       this.logger.log(`Diagnóstico criado com sucesso: ID ${diagnosis.id}`);
+
+      // Criar notificação de diagnóstico concluído
+      try {
+        await this.notificationsService.sendDiagnosisResultNotification(userId, diagnosis);
+      } catch (error) {
+        console.error('Erro ao criar notificação de diagnóstico:', error);
+      }
+
       return diagnosis;
     } catch (error) {
       this.logger.error(`Erro ao analisar imagem: ${error.message}`, error.stack);
@@ -361,6 +380,7 @@ export class DiagnosisService {
       const userProfile = {
         id: user.id,
         name: user.name,
+        email: user.email,
         birthDate: user.birthDate,
         medicalHistory: {
           existingConditions: [], // Pode ser expandido no futuro
@@ -380,8 +400,11 @@ export class DiagnosisService {
         condition: analysisResult.condition,
         severity: analysisResult.severity,
         score: analysisResult.score,
-        date: new Date()
+        createdAt: new Date()
       };
+
+      // Adicionar o diagnóstico atual ao perfil do usuário
+      userProfile.diagnoses.push(currentDiagnosis);
 
       // Gerar recomendações personalizadas usando Gemini
       const personalizedTips = await this.personalizedContentService.generatePersonalizedTips(

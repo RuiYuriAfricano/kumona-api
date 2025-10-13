@@ -58,9 +58,17 @@ export class WebsocketService {
 
   // Enviar notificação para um usuário específico
   async sendNotificationToUser(userId: number, event: string, data: any) {
-    if (!this.userConnections.has(userId)) {
-      this.logger.log(`User ${userId} is not connected, storing notification`);
-      
+    this.logger.log(`🌐 [WebSocketService] ===== ENVIANDO NOTIFICAÇÃO VIA WEBSOCKET =====`);
+    this.logger.log(`🌐 [WebSocketService] UserId: ${userId}`);
+    this.logger.log(`🌐 [WebSocketService] Event: ${event}`);
+    this.logger.log(`🌐 [WebSocketService] Data:`, JSON.stringify(data, null, 2));
+
+    const isConnected = this.userConnections.has(userId);
+    this.logger.log(`🌐 [WebSocketService] Usuário conectado: ${isConnected}`);
+
+    if (!isConnected) {
+      this.logger.log(`🌐 [WebSocketService] User ${userId} is not connected, storing notification`);
+
       // Armazenar a notificação no banco de dados
       await this.prisma.notification.create({
         data: {
@@ -70,16 +78,25 @@ export class WebsocketService {
           type: data.type || 'info',
         },
       });
-      
+
+      this.logger.log(`🌐 [WebSocketService] Notificação armazenada no banco para usuário desconectado`);
       return false;
     }
 
     const connections = this.userConnections.get(userId);
-    for (const client of connections) {
-      client.emit(event, data);
+    this.logger.log(`🌐 [WebSocketService] Enviando para ${connections.size} conexões...`);
+
+    // Enviar apenas para a primeira conexão ativa para evitar duplicatas
+    const firstConnection = Array.from(connections)[0];
+    if (firstConnection) {
+      this.logger.log(`🌐 [WebSocketService] Emitindo evento '${event}' para primeira conexão ativa: ${firstConnection.id}`);
+      firstConnection.emit(event, data);
+      this.logger.log(`🌐 [WebSocketService] ✅ Notificação enviada para usuário ${userId} (1 de ${connections.size} conexões)`);
+    } else {
+      this.logger.log(`🌐 [WebSocketService] ❌ Nenhuma conexão ativa encontrada para usuário ${userId}`);
+      return false;
     }
-    
-    this.logger.log(`Sent notification to user ${userId} (${connections.size} connections)`);
+
     return true;
   }
 

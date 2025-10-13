@@ -77,7 +77,7 @@ export class NotificationsService {
     if (this.websocketService.isUserConnected(userId)) {
       this.websocketService.sendNotificationToUser(
         userId,
-        'notification_updated',
+        'notification',
         result
       );
     }
@@ -118,7 +118,7 @@ export class NotificationsService {
     if (this.websocketService.isUserConnected(userId)) {
       this.websocketService.sendNotificationToUser(
         userId,
-        'all_notifications_read',
+        'notification',
         response
       );
     }
@@ -135,6 +135,12 @@ export class NotificationsService {
     sendEmail: boolean = false,
     emailSubject?: string,
   ): Promise<NotificationDto> {
+    this.logger.log(`🔔 [NotificationsService] ===== CRIANDO NOTIFICAÇÃO =====`);
+    this.logger.log(`🔔 [NotificationsService] UserId: ${userId}`);
+    this.logger.log(`🔔 [NotificationsService] Title: ${title}`);
+    this.logger.log(`🔔 [NotificationsService] Message: ${message}`);
+    this.logger.log(`🔔 [NotificationsService] Type: ${type}`);
+
     // Criar a notificação no banco de dados
     const notification = await this.prisma.notification.create({
       data: {
@@ -145,7 +151,7 @@ export class NotificationsService {
       },
     });
 
-    this.logger.log(`Notificação criada para o usuário ${userId}: ${title}`);
+    this.logger.log(`🔔 [NotificationsService] Notificação criada no banco - ID: ${notification.id}`);
 
     // Enviar email se solicitado
     if (sendEmail) {
@@ -170,17 +176,23 @@ export class NotificationsService {
     }
 
     // Enviar notificação via WebSocket se o usuário estiver conectado
-    if (this.websocketService.isUserConnected(userId)) {
-      this.websocketService.sendNotificationToUser(
+    this.logger.log(`🔔 [NotificationsService] Verificando conexão WebSocket para usuário ${userId}...`);
+    const isConnected = this.websocketService.isUserConnected(userId);
+    this.logger.log(`🔔 [NotificationsService] Usuário ${userId} conectado via WebSocket: ${isConnected}`);
+
+    if (isConnected) {
+      this.logger.log(`🔔 [NotificationsService] Enviando notificação via WebSocket...`);
+      const sent = await this.websocketService.sendNotificationToUser(
         userId,
-        'new_notification',
+        'notification',
         notification
       );
-      this.logger.log(`Notificação enviada via WebSocket para o usuário ${userId}`);
+      this.logger.log(`🔔 [NotificationsService] Notificação WebSocket enviada: ${sent}`);
     } else {
-      this.logger.log(`Usuário ${userId} não está conectado via WebSocket. Notificação salva apenas no banco de dados.`);
+      this.logger.log(`🔔 [NotificationsService] Usuário ${userId} não está conectado via WebSocket. Notificação salva apenas no banco de dados.`);
     }
 
+    this.logger.log(`🔔 [NotificationsService] ===== NOTIFICAÇÃO PROCESSADA =====`);
     return notification;
   }
 
