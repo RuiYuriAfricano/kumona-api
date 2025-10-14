@@ -71,6 +71,52 @@ async function main() {
     },
   });
 
+  // Mais usuários para acompanhamento
+  const user3 = await prisma.user.upsert({
+    where: { email: 'pedro@example.com' },
+    update: {},
+    create: {
+      name: 'Pedro Oliveira',
+      email: 'pedro@example.com',
+      password: hashedPassword,
+      birthDate: new Date('1992-12-03'),
+      about: 'Engenheiro civil com histórico familiar de glaucoma',
+      phone: '+244 925 789 123',
+      role: UserRole.USER,
+      profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  const user4 = await prisma.user.upsert({
+    where: { email: 'ana.costa@example.com' },
+    update: {},
+    create: {
+      name: 'Ana Costa',
+      email: 'ana.costa@example.com',
+      password: hashedPassword,
+      birthDate: new Date('1988-04-17'),
+      about: 'Contadora que trabalha longas horas no computador',
+      phone: '+244 934 567 890',
+      role: UserRole.USER,
+      profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
+  const user5 = await prisma.user.upsert({
+    where: { email: 'carlos.silva@example.com' },
+    update: {},
+    create: {
+      name: 'Carlos Silva',
+      email: 'carlos.silva@example.com',
+      password: hashedPassword,
+      birthDate: new Date('1979-11-25'),
+      about: 'Diabético tipo 2, preocupado com retinopatia diabética',
+      phone: '+244 945 678 901',
+      role: UserRole.USER,
+      profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
+    },
+  });
+
   // 3. CLINIC USERS
   const clinicUser1 = await prisma.user.upsert({
     where: { email: 'clinica.visao@example.com' },
@@ -103,16 +149,13 @@ async function main() {
   });
 
   // 4. CRIAR CLÍNICAS
-  const clinic1 = await prisma.clinic.upsert({
-    where: { nif: '1234567890' },
-    update: {},
-    create: {
+  const clinic1 = await (prisma.clinic as any).create({
+    data: {
       name: 'Clínica Visão Clara',
       nif: '1234567890',
       address: 'Rua das Flores, 123, Maianga',
       city: 'Luanda',
-      state: 'LU',
-      zipCode: 'CP 1234',
+      state: 'Luanda',
       phone: '(244) 933-111-222',
       email: 'contato@visaoclara.ao',
       website: 'https://visaoclara.ao',
@@ -121,23 +164,20 @@ async function main() {
       status: ClinicStatus.APPROVED,
       responsibleName: 'Dr. Carlos Mendes',
       responsibleBi: '123456789AB123',
-      responsibleOrmed: 'ORMED-12345',
+      responsibleCrm: 'ORMED-12345',
       userId: clinicUser1.id,
       approvedBy: adminUser.id,
       approvedAt: new Date(),
     },
   });
 
-  const clinic2 = await prisma.clinic.upsert({
-    where: { nif: '9876543210' },
-    update: {},
-    create: {
+  const clinic2 = await (prisma.clinic as any).create({
+    data: {
       name: 'Centro Oftálmico de Angola',
       nif: '9876543210',
       address: 'Avenida Norton de Matos, 456, Centro',
       city: 'Benguela',
-      state: 'BE',
-      zipCode: 'CP 5678',
+      state: 'Benguela',
       phone: '(244) 944-333-444',
       email: 'info@centrooftalmico.ao',
       website: 'https://centrooftalmico.ao',
@@ -146,7 +186,7 @@ async function main() {
       status: ClinicStatus.APPROVED,
       responsibleName: 'Dra. Ana Ferreira',
       responsibleBi: '987654321CD456',
-      responsibleOrmed: 'ORMED-67890',
+      responsibleCrm: 'ORMED-67890',
       userId: clinicUser2.id,
       approvedBy: adminUser.id,
       approvedAt: new Date(),
@@ -169,16 +209,13 @@ async function main() {
     },
   });
 
-  const clinic3 = await prisma.clinic.upsert({
-    where: { nif: '1122233344' },
-    update: {},
-    create: {
+  const clinic3 = await (prisma.clinic as any).create({
+    data: {
       name: 'Clínica Olhar Novo',
       nif: '1122233344',
       address: 'Rua da Esperança, 789, Huambo',
       city: 'Huambo',
-      state: 'HU',
-      zipCode: 'CP 9101',
+      state: 'Huambo',
       phone: '(244) 955-666-777',
       email: 'contato@olharnovo.ao',
       specialties: ['Oftalmologia Geral', 'Pediatria Oftálmica'],
@@ -186,9 +223,35 @@ async function main() {
       status: ClinicStatus.PENDING,
       responsibleName: 'Dr. Pedro Costa',
       responsibleBi: '111222333EF789',
-      responsibleOrmed: 'ORMED-11111',
+      responsibleCrm: 'ORMED-11111',
       userId: clinicUser3.id,
     },
+  });
+
+  // Atualizar usuários para selecionar clínicas para acompanhamento
+  await prisma.user.update({
+    where: { id: user1.id },
+    data: { selectedClinicId: clinic1.id }
+  });
+
+  await prisma.user.update({
+    where: { id: user2.id },
+    data: { selectedClinicId: clinic1.id }
+  });
+
+  await prisma.user.update({
+    where: { id: user3.id },
+    data: { selectedClinicId: clinic2.id }
+  });
+
+  await prisma.user.update({
+    where: { id: user4.id },
+    data: { selectedClinicId: clinic2.id }
+  });
+
+  await prisma.user.update({
+    where: { id: user5.id },
+    data: { selectedClinicId: clinic1.id }
   });
 
   // Criar histórico médico
@@ -214,6 +277,39 @@ async function main() {
     },
   });
 
+  await prisma.medicalHistory.upsert({
+    where: { userId: user3.id },
+    update: {},
+    create: {
+      userId: user3.id,
+      existingConditions: [],
+      familyHistory: ['Glaucoma (pai)', 'Hipertensão (família)'],
+      medications: [],
+    },
+  });
+
+  await prisma.medicalHistory.upsert({
+    where: { userId: user4.id },
+    update: {},
+    create: {
+      userId: user4.id,
+      existingConditions: ['Fadiga ocular', 'Miopia'],
+      familyHistory: ['Diabetes (avó)'],
+      medications: ['Colírio lubrificante'],
+    },
+  });
+
+  await prisma.medicalHistory.upsert({
+    where: { userId: user5.id },
+    update: {},
+    create: {
+      userId: user5.id,
+      existingConditions: ['Diabetes tipo 2', 'Hipertensão'],
+      familyHistory: ['Retinopatia diabética (irmão)'],
+      medications: ['Metformina', 'Losartana', 'Colírio preventivo'],
+    },
+  });
+
   // 5. CRIAR PACIENTES DAS CLÍNICAS
   const patient1 = await prisma.patient.create({
     data: {
@@ -225,8 +321,8 @@ async function main() {
       gender: 'M',
       address: 'Rua A, 100',
       city: 'Luanda',
-      state: 'LU',
-      zipCode: '10001-000',
+      state: 'Luanda',
+
       allergies: ['Penicilina'],
       medications: ['Colírio para glaucoma'],
       medicalHistory: ['Hipertensão', 'Diabetes tipo 2'],
@@ -245,8 +341,8 @@ async function main() {
       gender: 'F',
       address: 'Avenida B, 200',
       city: 'Luanda',
-      state: 'LU',
-      zipCode: '10002-000',
+      state: 'Luanda',
+
       allergies: [],
       medications: ['Vitaminas para os olhos'],
       medicalHistory: ['Miopia'],
@@ -265,8 +361,8 @@ async function main() {
       gender: 'M',
       address: 'Rua C, 300',
       city: 'Benguela',
-      state: 'BE',
-      zipCode: '20001-000',
+      state: 'Benguela',
+
       allergies: ['Sulfa'],
       medications: ['Colírio anti-inflamatório'],
       medicalHistory: ['Catarata bilateral'],
@@ -285,8 +381,8 @@ async function main() {
       gender: 'F',
       address: 'Avenida D, 400',
       city: 'Benguela',
-      state: 'BE',
-      zipCode: '20002-000',
+      state: 'Benguela',
+
       allergies: [],
       medications: [],
       medicalHistory: ['Olho seco'],
@@ -444,6 +540,64 @@ async function main() {
       specialistNotes: 'Diagnóstico correto. Paciente encaminhada para especialista em retina.',
       correctedCondition: 'diabetic_retinopathy', // Confirmado pelo especialista
       correctedSeverity: 'high',
+    },
+  });
+
+  // Mais diagnósticos pendentes de validação para testar a página
+  const patientDiagnosis6 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'cataract',
+      severity: 'medium',
+      score: 82,
+      description: 'Catarata nuclear moderada detectada no olho direito.',
+      recommendations: [
+        'Avaliação cirúrgica',
+        'Monitoramento da progressão',
+        'Uso de óculos de sol',
+        'Controle de fatores de risco'
+      ],
+      patientId: patient1.id,
+      clinicId: clinic1.id,
+      validated: false,
+    },
+  });
+
+  const patientDiagnosis7 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'glaucoma',
+      severity: 'low',
+      score: 75,
+      description: 'Sinais iniciais de glaucoma detectados. Pressão intraocular elevada.',
+      recommendations: [
+        'Medição da pressão intraocular',
+        'Campo visual',
+        'Tomografia de coerência óptica',
+        'Acompanhamento trimestral'
+      ],
+      patientId: patient2.id,
+      clinicId: clinic1.id,
+      validated: false,
+    },
+  });
+
+  const patientDiagnosis8 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'normal',
+      severity: 'low',
+      score: 95,
+      description: 'Exame oftalmológico normal. Estruturas oculares sem alterações.',
+      recommendations: [
+        'Manter exames preventivos anuais',
+        'Proteção solar adequada',
+        'Dieta rica em antioxidantes',
+        'Exercícios regulares'
+      ],
+      patientId: patient3.id,
+      clinicId: clinic2.id,
+      validated: false,
     },
   });
 

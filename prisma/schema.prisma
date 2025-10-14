@@ -182,20 +182,21 @@ model Clinic {
   nif             String        @unique
   address         String
   city            String
-  state           String
-  zipCode         String
+  state           String?
+  zipCode         String?
   phone           String
   email           String        @unique
   website         String?
   specialties     String[]      // Especialidades médicas
   description     String?
   logo            String?
+  profileImage    String?       // Foto do perfil da clínica
   status          ClinicStatus  @default(PENDING)
 
   // Dados do responsável
   responsibleName String
   responsibleBi   String
-  responsibleOrmed String?      // ORMED do médico responsável
+  responsibleCrm  String?      // CRM do médico responsável
 
   // Relacionamentos
   userId          Int           @unique

@@ -32,6 +32,11 @@ export class UpdateClinicProfileDto {
   @Length(0, 20)
   zipCode?: string;
 
+  @ApiPropertyOptional({ description: 'NIF da clínica' })
+  @IsOptional()
+  @IsString()
+  nif?: string;
+
   @ApiPropertyOptional({ description: 'Telefone da clínica' })
   @IsOptional()
   @IsString()

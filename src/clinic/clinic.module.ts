@@ -4,9 +4,12 @@ import { ClinicService } from './clinic.service';
 import { PatientDiagnosisService } from './patient-diagnosis.service';
 import { SpecialistFeedbackService } from './specialist-feedback.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { DiagnosisModule } from '../diagnosis/diagnosis.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, DiagnosisModule, NotificationsModule, AiModule],
   controllers: [ClinicController],
   providers: [ClinicService, PatientDiagnosisService, SpecialistFeedbackService],
   exports: [ClinicService, PatientDiagnosisService, SpecialistFeedbackService]

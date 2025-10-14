@@ -73,6 +73,47 @@ export class ClinicController {
     return this.clinicService.updateClinicProfile(req.user.id, updateProfileDto);
   }
 
+  @Post('profile/image')
+  @ApiOperation({ summary: 'Atualizar foto do perfil da clínica' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Foto do perfil atualizada com sucesso'
+  })
+  @UseInterceptors(FileInterceptor('profileImage'))
+  async updateProfileImage(
+    @Request() req,
+    @UploadedFile() imageFile: Express.Multer.File
+  ) {
+    return this.clinicService.updateProfileImage(req.user.id, imageFile);
+  }
+
+  @Get('patients/:id')
+  @ApiOperation({ summary: 'Buscar detalhes de um paciente específico' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalhes do paciente encontrados'
+  })
+  async getPatientDetails(
+    @Request() req,
+    @Param('id') patientId: string
+  ) {
+    return this.clinicService.getPatientDetails(req.user.id, parseInt(patientId));
+  }
+
+  @Get('patients/:id/diagnoses')
+  @ApiOperation({ summary: 'Buscar diagnósticos de um paciente específico' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Diagnósticos do paciente encontrados'
+  })
+  async getPatientDiagnoses(
+    @Request() req,
+    @Param('id') patientId: string
+  ) {
+    return this.clinicService.getPatientDiagnoses(req.user.id, parseInt(patientId));
+  }
+
   @Post('patients')
   @ApiOperation({ summary: 'Cadastrar novo paciente' })
   @ApiResponse({
@@ -294,7 +335,7 @@ export class ClinicController {
     @Param('patientId', ParseIntPipe) patientId: number,
     @UploadedFile() imageFile: Express.Multer.File
   ) {
-    return this.patientDiagnosisService.analyzePatientImage(req.user.id, patientId, imageFile);
+    return this.clinicService.analyzePatientImage(req.user.id, patientId, imageFile);
   }
 
   @Post('patients/:patientId/diagnoses/manual')
@@ -318,23 +359,7 @@ export class ClinicController {
     return this.patientDiagnosisService.createManualDiagnosis(req.user.id, createDiagnosisDto);
   }
 
-  @Get('patients/:patientId/diagnoses')
-  @ApiOperation({ summary: 'Listar diagnósticos de um paciente' })
-  @ApiParam({
-    name: 'patientId',
-    description: 'ID do paciente',
-    type: 'number'
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de diagnósticos retornada com sucesso'
-  })
-  async getPatientDiagnoses(
-    @Request() req,
-    @Param('patientId', ParseIntPipe) patientId: number
-  ) {
-    return this.patientDiagnosisService.getPatientDiagnoses(req.user.id, patientId);
-  }
+
 
   @Get('diagnoses')
   @ApiOperation({ summary: 'Listar todos os diagnósticos da clínica' })

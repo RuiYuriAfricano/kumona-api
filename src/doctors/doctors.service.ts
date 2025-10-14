@@ -51,7 +51,7 @@ export class DoctorsService {
               city: true,
               phone: true,
               specialties: true,
-              responsibleOrmed: true
+              responsibleCrm: true
             }
           }
         },
@@ -79,7 +79,7 @@ export class DoctorsService {
         city: doctor.clinic.city,
         phone: doctor.clinic.phone
       } : null,
-      responsibleOrmed: doctor.clinic?.responsibleOrmed,
+      responsibleCrm: doctor.clinic?.responsibleCrm,
       createdAt: doctor.createdAt.toISOString()
     }));
 
@@ -112,7 +112,7 @@ export class DoctorsService {
             city: true,
             phone: true,
             specialties: true,
-            responsibleOrmed: true,
+            responsibleCrm: true,
             description: true
           }
         }
@@ -136,7 +136,7 @@ export class DoctorsService {
         phone: doctor.clinic.phone,
         description: doctor.clinic.description
       } : null,
-      responsibleOrmed: doctor.clinic?.responsibleOrmed,
+      responsibleCrm: doctor.clinic?.responsibleCrm,
       createdAt: doctor.createdAt.toISOString()
     };
   }
