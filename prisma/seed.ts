@@ -601,6 +601,188 @@ async function main() {
     },
   });
 
+  // Mais diagnósticos para enriquecer o dashboard
+  const patientDiagnosis9 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'cataract',
+      severity: 'high',
+      score: 89,
+      description: 'Catarata avançada detectada no olho direito. Opacificação significativa do cristalino.',
+      recommendations: [
+        'Cirurgia de catarata recomendada urgentemente',
+        'Evitar dirigir à noite',
+        'Usar óculos de sol com proteção UV',
+        'Consulta com cirurgião oftalmológico'
+      ],
+      patientId: patient1.id,
+      clinicId: clinic1.id,
+      validated: true,
+      validatedBy: clinic1.id,
+      validatedAt: new Date(),
+    },
+  });
+
+  const patientDiagnosis10 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'diabetic_retinopathy',
+      severity: 'medium',
+      score: 76,
+      description: 'Retinopatia diabética não proliferativa moderada. Microaneurismas e exsudatos presentes.',
+      recommendations: [
+        'Controle rigoroso da glicemia',
+        'Consulta com endocrinologista',
+        'Exames de fundo de olho a cada 6 meses',
+        'Considerar tratamento com laser se necessário'
+      ],
+      patientId: patient2.id,
+      clinicId: clinic1.id,
+      validated: false,
+    },
+  });
+
+  const patientDiagnosis11 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'glaucoma',
+      severity: 'medium',
+      score: 83,
+      description: 'Glaucoma de ângulo aberto em estágio moderado. Pressão intraocular elevada.',
+      recommendations: [
+        'Uso contínuo de colírios hipotensores',
+        'Monitoramento da pressão intraocular',
+        'Exames de campo visual regulares',
+        'Evitar exercícios que aumentem a pressão intraocular'
+      ],
+      patientId: patient3.id,
+      clinicId: clinic2.id,
+      validated: true,
+      validatedBy: clinic2.id,
+      validatedAt: new Date(),
+    },
+  });
+
+  const patientDiagnosis12 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'normal',
+      severity: 'low',
+      score: 92,
+      description: 'Exame preventivo com resultado normal. Boa saúde ocular.',
+      recommendations: [
+        'Continuar com exames anuais de rotina',
+        'Manter hábitos saudáveis',
+        'Proteger os olhos da luz solar'
+      ],
+      patientId: patient1.id,
+      clinicId: clinic1.id,
+      validated: true,
+      validatedBy: clinic1.id,
+      validatedAt: new Date(),
+    },
+  });
+
+  const patientDiagnosis13 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'cataract',
+      severity: 'low',
+      score: 71,
+      description: 'Catarata inicial detectada. Opacificação leve do cristalino.',
+      recommendations: [
+        'Monitoramento regular da progressão',
+        'Uso de óculos com proteção UV',
+        'Avaliação semestral',
+        'Considerar cirurgia quando sintomas piorarem'
+      ],
+      patientId: patient2.id,
+      clinicId: clinic2.id,
+      validated: false,
+    },
+  });
+
+  const patientDiagnosis14 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'diabetic_retinopathy',
+      severity: 'high',
+      score: 91,
+      description: 'Retinopatia diabética proliferativa. Neovascularização presente.',
+      recommendations: [
+        'Tratamento com laser urgente',
+        'Controle glicêmico rigoroso',
+        'Acompanhamento oftalmológico mensal',
+        'Possível necessidade de vitrectomia'
+      ],
+      patientId: patient3.id,
+      clinicId: clinic1.id,
+      validated: true,
+      validatedBy: clinic1.id,
+      validatedAt: new Date(),
+    },
+  });
+
+  const patientDiagnosis15 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'glaucoma',
+      severity: 'high',
+      score: 88,
+      description: 'Glaucoma avançado com dano significativo ao nervo óptico.',
+      recommendations: [
+        'Tratamento medicamentoso intensivo',
+        'Considerar cirurgia de glaucoma',
+        'Monitoramento frequente da pressão intraocular',
+        'Exames de campo visual mensais'
+      ],
+      patientId: patient1.id,
+      clinicId: clinic2.id,
+      validated: true,
+      validatedBy: clinic2.id,
+      validatedAt: new Date(),
+    },
+  });
+
+  const patientDiagnosis16 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'normal',
+      severity: 'low',
+      score: 94,
+      description: 'Exame de rotina normal. Estruturas oculares preservadas.',
+      recommendations: [
+        'Manter consultas anuais',
+        'Alimentação balanceada',
+        'Exercícios regulares'
+      ],
+      patientId: patient2.id,
+      clinicId: clinic1.id,
+      validated: false,
+    },
+  });
+
+  const patientDiagnosis17 = await prisma.patientDiagnosis.create({
+    data: {
+      imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
+      condition: 'cataract',
+      severity: 'medium',
+      score: 79,
+      description: 'Catarata moderada bilateral. Redução da acuidade visual.',
+      recommendations: [
+        'Avaliação para cirurgia de catarata',
+        'Uso de óculos adequados',
+        'Evitar dirigir em condições de baixa luminosidade',
+        'Acompanhamento trimestral'
+      ],
+      patientId: patient3.id,
+      clinicId: clinic2.id,
+      validated: true,
+      validatedBy: clinic2.id,
+      validatedAt: new Date(),
+    },
+  });
+
   // 7. CRIAR FEEDBACK DE ESPECIALISTAS
   const feedback1 = await prisma.specialistFeedback.create({
     data: {

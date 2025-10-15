@@ -9,8 +9,8 @@ export class CreateClinicDto {
 
   @ApiProperty({ description: 'NIF da clínica' })
   @IsString()
-  @Matches(/^\d{10}$/, {
-    message: 'NIF deve conter 10 dígitos para pessoa coletiva'
+  @Matches(/^\d{9}[A-Z]{2}\d{3}$/, {
+    message: 'NIF deve seguir o formato: 9 números + 2 letras + 3 números (ex: 123456789AB123)'
   })
   nif: string;
 
@@ -26,7 +26,7 @@ export class CreateClinicDto {
 
   @ApiProperty({ description: 'Estado' })
   @IsString()
-  @Length(2, 2)
+  @Length(2, 50)
   state: string;
 
   @ApiProperty({ description: 'Código Postal' })
@@ -36,8 +36,8 @@ export class CreateClinicDto {
 
   @ApiProperty({ description: 'Telefone da clínica' })
   @IsString()
-  @Matches(/^\(\d{3}\)\s\d{3}-\d{3}-\d{3}$|^\+\d{3}\s\d{3}\s\d{3}\s\d{3}$/, {
-    message: 'Telefone deve estar no formato (244) XXX-XXX-XXX ou +244 XXX XXX XXX'
+  @Matches(/^\+244\s9\d{2}\s\d{3}\s\d{3}$/, {
+    message: 'Telefone deve estar no formato +244 9XX XXX XXX e começar com 9'
   })
   phone: string;
 

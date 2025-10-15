@@ -244,11 +244,15 @@ export class AdminService {
   /**
    * Obter estatísticas administrativas
    */
-  async getAdminStats(adminId: number): Promise<AdminStatsDto> {
+  async getAdminStats(adminId: number, clinicId?: number): Promise<AdminStatsDto> {
     await this.verifyAdminRole(adminId);
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Filtros condicionais por clínica
+    const clinicFilter = clinicId ? { clinicId } : {};
+    const patientFilter = clinicId ? { clinicId } : {};
 
     const [
       totalUsers,
@@ -262,14 +266,15 @@ export class AdminService {
       newDiagnosesThisMonth
     ] = await Promise.all([
       this.prisma.user.count({ where: { deleted: false } }),
-      this.prisma.clinic.count(),
+      clinicId ? 1 : this.prisma.clinic.count(), // Se filtrado por clínica, sempre 1
       this.prisma.clinic.groupBy({
         by: ['status'],
-        _count: true
+        _count: true,
+        ...(clinicId && { where: { id: clinicId } })
       }),
-      this.prisma.patient.count(),
-      this.prisma.patientDiagnosis.count(),
-      this.prisma.patientDiagnosis.count({ where: { validated: true } }),
+      this.prisma.patient.count({ where: patientFilter }),
+      this.prisma.patientDiagnosis.count({ where: clinicFilter }),
+      this.prisma.patientDiagnosis.count({ where: { validated: true, ...clinicFilter } }),
       this.prisma.specialistFeedback.count(),
       this.prisma.user.count({
         where: {
@@ -279,7 +284,8 @@ export class AdminService {
       }),
       this.prisma.patientDiagnosis.count({
         where: {
-          createdAt: { gte: startOfMonth }
+          createdAt: { gte: startOfMonth },
+          ...clinicFilter
         }
       })
     ]);

@@ -8,6 +8,8 @@ import { UserRole } from '@prisma/client';
 import { DiagnosisService } from '../diagnosis/diagnosis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PersonalizedContentService } from '../ai/personalized-content.service';
+import { AiService } from '../ai/ai.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class ClinicService {
@@ -17,7 +19,9 @@ export class ClinicService {
     private prisma: PrismaService,
     private diagnosisService: DiagnosisService,
     private notificationsService: NotificationsService,
-    private personalizedContentService: PersonalizedContentService
+    private personalizedContentService: PersonalizedContentService,
+    private aiService: AiService,
+    private emailService: EmailService
   ) {}
 
   /**
@@ -98,7 +102,18 @@ export class ClinicService {
       }
     }
 
-    return this.prisma.clinic.update({
+    // Verificar se NIF já existe (se estiver sendo alterado)
+    if (updateData.nif && updateData.nif !== clinic.nif) {
+      const existingNif = await this.prisma.clinic.findUnique({
+        where: { nif: updateData.nif }
+      });
+
+      if (existingNif) {
+        throw new BadRequestException('NIF já está em uso por outra clínica');
+      }
+    }
+
+    const updatedClinic = await this.prisma.clinic.update({
       where: { id: clinic.id },
       data: updateData,
       include: {
@@ -112,6 +127,20 @@ export class ClinicService {
         }
       }
     });
+
+    // Criar notificação de perfil atualizado
+    try {
+      await this.notificationsService.createNotification(
+        userId,
+        '✅ Perfil da Clínica Atualizado',
+        'As informações do perfil da sua clínica foram atualizadas com sucesso. Mantenha seus dados sempre atualizados para oferecer o melhor atendimento aos pacientes.',
+        'success'
+      );
+    } catch (error) {
+      this.logger.error('Erro ao criar notificação de perfil atualizado:', error);
+    }
+
+    return updatedClinic;
   }
 
   /**
@@ -148,6 +177,18 @@ export class ClinicService {
         data: { profileImage: imageBase64 }
       })
     ]);
+
+    // Criar notificação de foto atualizada
+    try {
+      await this.notificationsService.createNotification(
+        userId,
+        '📸 Foto do Perfil Atualizada',
+        'A foto do perfil da sua clínica foi atualizada com sucesso. Uma imagem profissional ajuda a transmitir confiança aos seus pacientes.',
+        'success'
+      );
+    } catch (error) {
+      this.logger.error('Erro ao criar notificação de foto atualizada:', error);
+    }
 
     return { profileImage: imageBase64 };
   }
@@ -211,6 +252,15 @@ export class ClinicService {
       },
       orderBy: { createdAt: 'desc' },
       include: {
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            birthDate: true,
+            gender: true
+          }
+        },
         clinic: {
           include: {
             user: {
@@ -224,20 +274,24 @@ export class ClinicService {
       }
     });
 
-    return {
-      data: diagnoses.map(diagnosis => ({
-        id: diagnosis.id,
-        condition: diagnosis.condition,
-        severity: diagnosis.severity,
-        score: diagnosis.score,
-        imageUrl: diagnosis.imageUrl,
-        createdAt: diagnosis.createdAt,
-        validated: diagnosis.validated,
-        validatedBy: diagnosis.clinic?.user?.name,
-        validatedAt: diagnosis.validatedAt,
-        notes: diagnosis.description
-      }))
-    };
+    return diagnoses.map(diagnosis => ({
+      id: diagnosis.id,
+      condition: diagnosis.condition,
+      severity: diagnosis.severity,
+      score: diagnosis.score,
+      description: diagnosis.description,
+      recommendations: diagnosis.recommendations,
+      imageUrl: diagnosis.imageUrl,
+      createdAt: diagnosis.createdAt,
+      updatedAt: diagnosis.updatedAt,
+      validated: diagnosis.validated,
+      validatedBy: diagnosis.validatedBy,
+      validatedAt: diagnosis.validatedAt,
+      specialistNotes: diagnosis.specialistNotes,
+      correctedCondition: diagnosis.correctedCondition,
+      correctedSeverity: diagnosis.correctedSeverity,
+      patient: diagnosis.patient
+    }));
   }
 
   /**
@@ -291,16 +345,52 @@ export class ClinicService {
     const clinic = await this.verifyClinicRole(userId);
 
     const skip = (page - 1) * limit;
+
+    // Melhorar a busca para ser mais inteligente
+    let searchConditions = [];
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+
+      // Busca por nome (palavras parciais)
+      searchConditions.push({ name: { contains: searchTerm, mode: 'insensitive' as const } });
+
+      // Busca por email
+      if (searchTerm.includes('@') || searchTerm.includes('.')) {
+        searchConditions.push({ email: { contains: searchTerm, mode: 'insensitive' as const } });
+      }
+
+      // Busca por BI (mais flexível)
+      if (/[\d]/.test(searchTerm)) {
+        // Se contém números, buscar no BI
+        searchConditions.push({ bi: { contains: searchTerm, mode: 'insensitive' as const } });
+
+        // Também buscar BI sem formatação (apenas números)
+        const numbersOnly = searchTerm.replace(/\D/g, '');
+        if (numbersOnly.length >= 3) {
+          searchConditions.push({ bi: { contains: numbersOnly, mode: 'insensitive' as const } });
+        }
+      }
+
+      // Busca por telefone se parece com número
+      if (/^[\d\s\-\+\(\)]+$/.test(searchTerm)) {
+        searchConditions.push({ phone: { contains: searchTerm, mode: 'insensitive' as const } });
+
+        // Buscar telefone sem formatação
+        const phoneNumbers = searchTerm.replace(/\D/g, '');
+        if (phoneNumbers.length >= 3) {
+          searchConditions.push({ phone: { contains: phoneNumbers, mode: 'insensitive' as const } });
+        }
+      }
+    }
+
     const where = {
       clinicId: clinic.id,
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' as const } },
-          { email: { contains: search, mode: 'insensitive' as const } },
-          { bi: { contains: search, mode: 'insensitive' as const } }
-        ]
+      ...(searchConditions.length > 0 && {
+        OR: searchConditions
       })
     };
+
+
 
     const [patients, total] = await Promise.all([
       this.prisma.patient.findMany({
@@ -320,6 +410,8 @@ export class ClinicService {
       }),
       this.prisma.patient.count({ where })
     ]);
+
+
 
     return {
       data: patients,
@@ -551,20 +643,11 @@ export class ClinicService {
       throw new BadRequestException('Este email já está cadastrado no sistema');
     }
 
-    // Gerar senha aleatória
-    const generatePassword = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-      let password = '';
-      for (let i = 0; i < 8; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return password;
-    };
+    // Usar senha padrão para pacientes registrados por médicos
+    const defaultPassword = '1234567890';
 
-    const temporaryPassword = generatePassword();
-
-    // Hash da senha temporária
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+    // Hash da senha padrão
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
     // Criar o usuário
     const newUser = await this.prisma.user.create({
@@ -574,11 +657,62 @@ export class ClinicService {
         phone: userData.phone,
         password: hashedPassword,
         role: UserRole.USER,
-        birthDate: new Date('1990-01-01') // Data padrão para usuários registrados pela clínica
-      }
+        birthDate: new Date('1990-01-01'), // Data padrão para usuários registrados pela clínica
+        isFirstLogin: true, // Marcar como primeiro login para forçar mudança de senha
+        medicalHistory: {
+          create: {
+            existingConditions: [],
+            familyHistory: [],
+            medications: [],
+          },
+        },
+        preferences: {
+          create: {
+            notificationsEnabled: true,
+            reminderFrequency: 'daily',
+            language: 'pt',
+          },
+        },
+      },
+      include: {
+        medicalHistory: true,
+        preferences: true,
+      },
     });
 
     this.logger.log(`Novo usuário ${newUser.id} registrado pela clínica ${clinic.id}`);
+
+    // Notificar o médico/clínica sobre o novo paciente registrado
+    try {
+      await this.notificationsService.createNotification(
+        userId,
+        '👤 Novo Paciente Registrado',
+        `Paciente ${newUser.name} foi registrado com sucesso. Email: ${newUser.email}`,
+        'info'
+      );
+    } catch (error) {
+      this.logger.error('Erro ao criar notificação para médico:', error);
+    }
+
+    // Notificar o paciente sobre o registro (se tiver email)
+    try {
+      await this.notificationsService.createNotification(
+        newUser.id,
+        '🏥 Bem-vindo ao Kumona!',
+        `Sua conta foi criada pela clínica ${clinic.name}. Use a senha padrão: ${defaultPassword}. Recomendamos alterar sua senha no primeiro acesso.`,
+        'success'
+      );
+
+      // Enviar email de boas-vindas com credenciais
+      await this.emailService.sendNotificationEmail(
+        newUser.email,
+        'Bem-vindo ao Kumona - Suas credenciais de acesso',
+        `Olá ${newUser.name}!\n\nSua conta foi criada pela clínica ${clinic.name}.\n\nSuas credenciais de acesso:\nEmail: ${newUser.email}\nSenha: ${defaultPassword}\n\nPor segurança, recomendamos que altere sua senha no primeiro acesso.\n\nBem-vindo ao Kumona!`,
+        newUser.name
+      );
+    } catch (error) {
+      this.logger.error('Erro ao enviar notificação/email para paciente:', error);
+    }
 
     // Retornar as credenciais para a clínica mostrar ao usuário
     return {
@@ -590,9 +724,9 @@ export class ClinicService {
       },
       credentials: {
         email: newUser.email,
-        password: temporaryPassword
+        password: defaultPassword
       },
-      message: 'Usuário registrado com sucesso. Forneça as credenciais ao paciente.'
+      message: 'Usuário registrado com sucesso. Credenciais enviadas por email ao paciente.'
     };
   }
 
@@ -757,8 +891,19 @@ export class ClinicService {
     }
 
     try {
-      // Usar o serviço de diagnóstico para analisar a imagem
-      const diagnosisResult = await this.diagnosisService.analyzeImage(userId, imageFile);
+      // Usar o AiService diretamente para analisar a imagem (sem criar notificações)
+      const tempDir = process.env.TEMP_DIR || './temp';
+      if (!require('fs').existsSync(tempDir)) {
+        require('fs').mkdirSync(tempDir, { recursive: true });
+      }
+
+      const tempFilePath = require('path').join(tempDir, `${Date.now()}-${imageFile.originalname}`);
+      require('fs').writeFileSync(tempFilePath, imageFile.buffer);
+
+      const diagnosisResult = await this.aiService.analyzeEyeImage(tempFilePath);
+
+      // Limpar arquivo temporário
+      require('fs').unlinkSync(tempFilePath);
 
       // Converter a imagem para base64 para armazenamento
       const imageBase64 = `data:${imageFile.mimetype};base64,${imageFile.buffer.toString('base64')}`;
@@ -933,5 +1078,99 @@ export class ClinicService {
       this.logger.error('Erro ao enviar notificações de diagnóstico:', error);
       // Não falhar o processo principal se as notificações falharem
     }
+  }
+
+  /**
+   * Atualizar histórico médico de um paciente (apenas para clínicas)
+   */
+  async updatePatientMedicalHistory(userId: number, patientId: number, medicalHistoryData: {
+    existingConditions: string[];
+    familyHistory: string[];
+    medications: string[];
+  }) {
+    const clinic = await this.verifyClinicRole(userId);
+
+    // Verificar se o paciente pertence à clínica
+    const patient = await this.prisma.patient.findFirst({
+      where: {
+        id: patientId,
+        clinicId: clinic.id
+      }
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Paciente não encontrado ou não pertence a esta clínica');
+    }
+
+    // Atualizar o histórico médico do paciente
+    const updatedPatient = await this.prisma.patient.update({
+      where: { id: patientId },
+      data: {
+        allergies: medicalHistoryData.existingConditions.filter(condition =>
+          condition.toLowerCase().includes('alergia') || condition.toLowerCase().includes('alérgico')
+        ),
+        medications: medicalHistoryData.medications,
+        medicalHistory: [
+          ...medicalHistoryData.existingConditions,
+          ...medicalHistoryData.familyHistory
+        ]
+      }
+    });
+
+    // Se o paciente tem email, verificar se é um usuário do sistema e atualizar também
+    if (patient.email) {
+      const patientUser = await this.prisma.user.findUnique({
+        where: { email: patient.email }
+      });
+
+      if (patientUser) {
+        // Verificar se já existe um histórico médico para o usuário
+        const existingHistory = await this.prisma.medicalHistory.findUnique({
+          where: { userId: patientUser.id }
+        });
+
+        if (existingHistory) {
+          // Atualizar histórico existente
+          await this.prisma.medicalHistory.update({
+            where: { userId: patientUser.id },
+            data: {
+              existingConditions: medicalHistoryData.existingConditions,
+              familyHistory: medicalHistoryData.familyHistory,
+              medications: medicalHistoryData.medications,
+              updatedAt: new Date()
+            }
+          });
+        } else {
+          // Criar novo histórico médico
+          await this.prisma.medicalHistory.create({
+            data: {
+              userId: patientUser.id,
+              existingConditions: medicalHistoryData.existingConditions,
+              familyHistory: medicalHistoryData.familyHistory,
+              medications: medicalHistoryData.medications
+            }
+          });
+        }
+
+        // Notificar o paciente sobre a atualização
+        try {
+          await this.notificationsService.createNotification(
+            patientUser.id,
+            '📋 Histórico Médico Atualizado',
+            `Seu histórico médico foi atualizado pela clínica ${clinic.name}. Verifique as informações em seu perfil.`,
+            'info'
+          );
+        } catch (error) {
+          this.logger.error('Erro ao notificar paciente sobre atualização do histórico médico:', error);
+        }
+      }
+    }
+
+    this.logger.log(`Histórico médico do paciente ${patient.name} atualizado pela clínica ${clinic.id}`);
+
+    return {
+      message: 'Histórico médico do paciente atualizado com sucesso',
+      patient: updatedPatient
+    };
   }
 }

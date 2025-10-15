@@ -2,6 +2,7 @@ import { Controller, Get, Put, Delete, Param, Body, UseGuards, Request, ParseInt
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dtos/update-user.dto';
+import { ChangePasswordDto } from './dtos/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('users')
@@ -144,5 +145,40 @@ export class UserController {
   async selectClinic(@Request() req, @Body() body: { clinicId: number }) {
     await this.userService.selectClinic(req.user.id, body.clinicId);
     return { message: 'Clínica selecionada com sucesso' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Alterar senha do usuário',
+    description: 'Permite ao usuário alterar sua senha fornecendo a senha atual e a nova senha'
+  })
+  @ApiBody({ type: ChangePasswordDto, description: 'Dados para alteração de senha' })
+  @ApiResponse({ status: 200, description: 'Senha alterada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Senha atual incorreta ou nova senha inválida' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
+    await this.userService.changePassword(req.user.id, changePasswordDto);
+    return { message: 'Senha alterada com sucesso' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('medical-history')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Atualizar histórico médico do usuário',
+    description: 'Permite ao usuário atualizar seu histórico médico, incluindo condições existentes, histórico familiar e medicamentos'
+  })
+  @ApiResponse({ status: 200, description: 'Histórico médico atualizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async updateMedicalHistory(@Request() req, @Body() medicalHistoryData: {
+    existingConditions: string[];
+    familyHistory: string[];
+    medications: string[];
+  }) {
+    return this.userService.updateMedicalHistory(req.user.id, medicalHistoryData);
   }
 }

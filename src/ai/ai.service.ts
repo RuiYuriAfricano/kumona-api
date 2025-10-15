@@ -272,12 +272,13 @@ export class AiService {
   }
 
   private processKumonaClassifierResponse(data: any): EyeAnalysisResult {
-    // Mapear as classes da API de classificação para condições mais descritivas
+    // Manter as classes em inglês para consistência no banco de dados
+    // O mapeamento para português será feito apenas no frontend
     const classMapping = {
-      'normal': 'Olhos saudáveis',
-      'cataract': 'Catarata',
-      'diabetic_retinopathy': 'Retinopatia diabética',
-      'glaucoma': 'Glaucoma'
+      'normal': 'normal',
+      'cataract': 'cataract',
+      'diabetic_retinopathy': 'diabetic_retinopathy',
+      'glaucoma': 'glaucoma'
     };
 
     // Mapear severidade baseada na confiança

@@ -360,13 +360,21 @@ export class DiagnosisService {
     try {
       this.logger.log(`Gerando recomendações personalizadas para usuário ${userId}`);
 
-      // Buscar dados do usuário para criar perfil
+      // Buscar dados do usuário para criar perfil completo
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: {
           diagnoses: {
             orderBy: { createdAt: 'desc' },
             take: 5 // Últimos 5 diagnósticos
+          },
+          medicalHistory: true, // Incluir histórico médico completo
+          selectedClinic: {
+            select: {
+              id: true,
+              name: true,
+              specialties: true
+            }
           }
         }
       });
@@ -376,17 +384,22 @@ export class DiagnosisService {
         return analysisResult.recommendations || [];
       }
 
-      // Criar perfil do usuário para o serviço de conteúdo personalizado
+      // Criar perfil completo do usuário para o serviço de conteúdo personalizado
       const userProfile = {
         id: user.id,
         name: user.name,
         email: user.email,
         birthDate: user.birthDate,
+        age: user.birthDate ? Math.floor((Date.now() - new Date(user.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null,
         medicalHistory: {
-          existingConditions: [], // Pode ser expandido no futuro
-          familyHistory: [],
-          medications: []
+          existingConditions: user.medicalHistory?.existingConditions || [],
+          familyHistory: user.medicalHistory?.familyHistory || [],
+          medications: user.medicalHistory?.medications || []
         },
+        selectedClinic: user.selectedClinic ? {
+          name: user.selectedClinic.name,
+          specialties: user.selectedClinic.specialties
+        } : null,
         diagnoses: user.diagnoses.map(d => ({
           condition: d.condition,
           severity: d.severity,
@@ -394,6 +407,8 @@ export class DiagnosisService {
           createdAt: d.createdAt
         }))
       };
+
+      this.logger.log(`Perfil do usuário criado com histórico médico: ${userProfile.medicalHistory.existingConditions.length} condições, ${userProfile.medicalHistory.familyHistory.length} histórico familiar, ${userProfile.medicalHistory.medications.length} medicamentos`);
 
       // Adicionar o diagnóstico atual ao contexto
       const currentDiagnosis = {

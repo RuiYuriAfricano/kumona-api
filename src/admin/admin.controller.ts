@@ -116,13 +116,19 @@ export class AdminController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Obter estatísticas administrativas (apenas admin)' })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    type: Number,
+    description: 'ID da clínica para filtrar estatísticas'
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Estatísticas retornadas com sucesso',
     type: AdminStatsDto
   })
-  async getAdminStats(@Request() req): Promise<AdminStatsDto> {
-    return this.adminService.getAdminStats(req.user.id);
+  async getAdminStats(@Request() req, @Query('clinicId') clinicId?: number): Promise<AdminStatsDto> {
+    return this.adminService.getAdminStats(req.user.id, clinicId);
   }
 
   @Get('users')

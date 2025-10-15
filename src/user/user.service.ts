@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dtos/update-user.dto';
+import { ChangePasswordDto } from './dtos/change-password.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
@@ -55,6 +57,21 @@ export class UserService {
       include: {
         medicalHistory: true,
         preferences: true,
+        selectedClinic: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            city: true,
+            state: true,
+            specialties: true,
+            description: true,
+            logo: true,
+            status: true
+          }
+        },
         diagnoses: {
           take: 5,
           orderBy: {
@@ -153,13 +170,22 @@ export class UserService {
 
   async selectClinic(userId: number, clinicId: number) {
     // Verificar se o usuário existe
-    await this.getUserById(userId);
+    const user = await this.getUserById(userId);
 
     // Verificar se a clínica existe e está aprovada
     const clinic = await this.prisma.clinic.findFirst({
       where: {
         id: clinicId,
         status: 'APPROVED'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
       }
     });
 
@@ -185,6 +211,134 @@ export class UserService {
       console.error('Erro ao criar notificação de clínica selecionada:', error);
     }
 
+    // Notificar o médico/clínica sobre o novo paciente interessado
+    try {
+      await this.notificationsService.createNotification(
+        clinic.user.id,
+        '👤 Novo Paciente Interessado',
+        `${user.name} selecionou sua clínica para acompanhamento. Entre em contato para agendar uma consulta.`,
+        'info'
+      );
+    } catch (error) {
+      console.error('Erro ao notificar clínica sobre novo paciente:', error);
+    }
+
     return updatedUser;
+  }
+
+  /**
+   * Alterar senha do usuário
+   */
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+    const { currentPassword, newPassword } = changePasswordDto;
+
+    // Buscar o usuário com a senha atual
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, deleted: false },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true
+      }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    // Verificar se a senha atual está correta
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Senha atual incorreta');
+    }
+
+    // Verificar se a nova senha é diferente da atual
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new BadRequestException('A nova senha deve ser diferente da senha atual');
+    }
+
+    // Hash da nova senha
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Atualizar a senha no banco de dados
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedNewPassword,
+        updatedAt: new Date()
+      }
+    });
+
+    // Criar notificação sobre a mudança de senha
+    try {
+      await this.notificationsService.createNotification(
+        userId,
+        '🔒 Senha Alterada',
+        'Sua senha foi alterada com sucesso. Se você não fez esta alteração, entre em contato conosco imediatamente.',
+        'info'
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de mudança de senha:', error);
+    }
+
+    return { message: 'Senha alterada com sucesso' };
+  }
+
+  /**
+   * Atualizar histórico médico do usuário
+   */
+  async updateMedicalHistory(userId: number, medicalHistoryData: {
+    existingConditions: string[];
+    familyHistory: string[];
+    medications: string[];
+  }) {
+    // Verificar se o usuário existe
+    await this.getUserById(userId);
+
+    // Verificar se já existe um histórico médico para o usuário
+    const existingHistory = await this.prisma.medicalHistory.findUnique({
+      where: { userId }
+    });
+
+    let medicalHistory;
+
+    if (existingHistory) {
+      // Atualizar histórico existente
+      medicalHistory = await this.prisma.medicalHistory.update({
+        where: { userId },
+        data: {
+          existingConditions: medicalHistoryData.existingConditions,
+          familyHistory: medicalHistoryData.familyHistory,
+          medications: medicalHistoryData.medications,
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // Criar novo histórico médico
+      medicalHistory = await this.prisma.medicalHistory.create({
+        data: {
+          userId,
+          existingConditions: medicalHistoryData.existingConditions,
+          familyHistory: medicalHistoryData.familyHistory,
+          medications: medicalHistoryData.medications
+        }
+      });
+    }
+
+    // Criar notificação sobre a atualização do histórico médico
+    try {
+      await this.notificationsService.createNotification(
+        userId,
+        '📋 Histórico Médico Atualizado',
+        'Seu histórico médico foi atualizado com sucesso. Essas informações ajudarão a fornecer um melhor acompanhamento.',
+        'info'
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de histórico médico atualizado:', error);
+    }
+
+    return medicalHistory;
   }
 }

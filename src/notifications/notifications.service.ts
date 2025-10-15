@@ -277,4 +277,81 @@ export class NotificationsService {
     this.logger.log(`Notificação em massa enviada para ${count} usuários`);
     return count;
   }
+
+  /**
+   * Notificar sobre agendamento de consulta
+   */
+  async notifyAppointmentScheduled(patientId: number, clinicId: number, appointmentData: any) {
+    try {
+      // Buscar dados do paciente e clínica
+      const patient = await this.prisma.user.findUnique({
+        where: { id: patientId },
+        select: { id: true, name: true, email: true }
+      });
+
+      const clinic = await this.prisma.clinic.findUnique({
+        where: { id: clinicId },
+        include: {
+          user: {
+            select: { id: true, name: true, email: true }
+          }
+        }
+      });
+
+      if (!patient || !clinic) return;
+
+      // Notificar paciente
+      await this.createNotification(
+        patientId,
+        '📅 Consulta Agendada',
+        `Sua consulta foi agendada na ${clinic.name} para ${appointmentData.date} às ${appointmentData.time}.`,
+        'success',
+        true,
+        'Consulta Agendada - Kumona'
+      );
+
+      // Notificar médico/clínica
+      await this.createNotification(
+        clinic.user.id,
+        '📅 Nova Consulta Agendada',
+        `Nova consulta agendada com ${patient.name} para ${appointmentData.date} às ${appointmentData.time}.`,
+        'info'
+      );
+
+    } catch (error) {
+      this.logger.error('Erro ao enviar notificações de agendamento:', error);
+    }
+  }
+
+  /**
+   * Notificar sobre lembrete de consulta (24h antes)
+   */
+  async notifyAppointmentReminder(patientId: number, clinicId: number, appointmentData: any) {
+    try {
+      const patient = await this.prisma.user.findUnique({
+        where: { id: patientId },
+        select: { id: true, name: true, email: true }
+      });
+
+      const clinic = await this.prisma.clinic.findUnique({
+        where: { id: clinicId },
+        select: { id: true, name: true }
+      });
+
+      if (!patient || !clinic) return;
+
+      // Lembrete para o paciente
+      await this.createNotification(
+        patientId,
+        '⏰ Lembrete de Consulta',
+        `Lembrete: Você tem uma consulta agendada na ${clinic.name} amanhã às ${appointmentData.time}. Não se esqueça!`,
+        'warning',
+        true,
+        'Lembrete de Consulta - Kumona'
+      );
+
+    } catch (error) {
+      this.logger.error('Erro ao enviar lembrete de consulta:', error);
+    }
+  }
 }

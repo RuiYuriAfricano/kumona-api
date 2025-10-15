@@ -16,16 +16,16 @@ export class CreatePatientDto {
   @ApiPropertyOptional({ description: 'Telefone do paciente' })
   @IsOptional()
   @IsString()
-  @Matches(/^\(\d{3}\)\s\d{3}-\d{3}-\d{3}$|^\+\d{3}\s\d{3}\s\d{3}\s\d{3}$/, {
-    message: 'Telefone deve estar no formato (244) XXX-XXX-XXX ou +244 XXX XXX XXX'
+  @Matches(/^(\+244\s9\d{2}\s\d{3}\s\d{3}|\d{9})$/, {
+    message: 'Telefone deve estar no formato +244 9XX XXX XXX e começar com 9, ou apenas 9 dígitos'
   })
   phone?: string;
 
   @ApiPropertyOptional({ description: 'BI do paciente' })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{9}[A-Z]{2}\d{3}$/, {
-    message: 'BI deve estar no formato NNNNNNNNNLLNNN (9 números + 2 letras + 3 números)'
+  @Matches(/^(\d{9}[A-Z]{2}\d{3}|\d{9,14}[A-Z]{0,2}\d{0,3})$/, {
+    message: 'BI deve conter números e letras no formato angolano'
   })
   bi?: string;
 
@@ -50,10 +50,10 @@ export class CreatePatientDto {
   @Length(0, 50)
   city?: string;
 
-  @ApiPropertyOptional({ description: 'Estado' })
+  @ApiPropertyOptional({ description: 'Estado/Província' })
   @IsOptional()
   @IsString()
-  @Length(0, 2)
+  @Length(0, 50)
   state?: string;
 
   @ApiPropertyOptional({ description: 'Código Postal' })

@@ -300,6 +300,25 @@ export class ClinicController {
     return this.clinicService.deletePatient(req.user.id, patientId);
   }
 
+  @Put('patients/:id/medical-history')
+  @ApiOperation({ summary: 'Atualizar histórico médico de um paciente' })
+  @ApiParam({ name: 'id', description: 'ID do paciente', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Histórico médico do paciente atualizado com sucesso'
+  })
+  async updatePatientMedicalHistory(
+    @Request() req,
+    @Param('id', ParseIntPipe) patientId: number,
+    @Body() medicalHistoryData: {
+      existingConditions: string[];
+      familyHistory: string[];
+      medications: string[];
+    }
+  ) {
+    return this.clinicService.updatePatientMedicalHistory(req.user.id, patientId, medicalHistoryData);
+  }
+
   @Get('stats')
   @ApiOperation({ summary: 'Obter estatísticas da clínica' })
   @ApiResponse({

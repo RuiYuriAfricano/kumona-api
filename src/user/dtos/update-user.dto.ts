@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsDateString, IsBoolean, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateMedicalHistoryDto {
@@ -56,6 +56,9 @@ export class UpdateUserDto {
 
   @IsString()
   @IsOptional()
+  @Matches(/^\+244\s9\d{2}\s\d{3}\s\d{3}$/, {
+    message: 'Telefone deve estar no formato +244 9XX XXX XXX e começar com 9'
+  })
   phone?: string;
 
   @IsOptional()
