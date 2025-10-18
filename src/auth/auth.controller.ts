@@ -7,6 +7,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { ClinicSignUpDto } from './dto/clinic-signup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
 
@@ -23,6 +24,16 @@ export class AuthController {
   @ApiResponse({ status: 409, description: 'Email já está em uso' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  @Post('clinic-signup')
+  @ApiOperation({ summary: 'Registro de clínica', description: 'Registra uma nova clínica no sistema' })
+  @ApiBody({ type: ClinicSignUpDto, description: 'Dados de registro da clínica' })
+  @ApiResponse({ status: 201, description: 'Clínica registrada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Dados de entrada inválidos' })
+  @ApiResponse({ status: 409, description: 'Email ou NIF já está em uso' })
+  async clinicSignUp(@Body() clinicSignUpDto: ClinicSignUpDto) {
+    return this.authService.clinicSignUp(clinicSignUpDto);
   }
 
   @Post('login')

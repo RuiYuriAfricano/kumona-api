@@ -192,6 +192,7 @@ model Clinic {
   logo            String?
   profileImage    String?       // Foto do perfil da clínica
   status          ClinicStatus  @default(PENDING)
+  deleted         Boolean       @default(false)
 
   // Dados do responsável
   responsibleName String

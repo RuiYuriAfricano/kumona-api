@@ -278,6 +278,35 @@ export class NotificationsService {
     return count;
   }
 
+  // Método para enviar notificação apenas para administradores
+  async notifyAdmins(
+    title: string,
+    message: string,
+    type: string,
+    sendEmail: boolean = false,
+    emailSubject?: string
+  ): Promise<number> {
+    // Buscar todos os administradores ativos
+    const admins = await this.prisma.user.findMany({
+      where: {
+        deleted: false,
+        role: 'ADMIN'
+      },
+      select: { id: true, name: true, email: true },
+    });
+
+    let count = 0;
+
+    // Criar notificações para cada admin
+    for (const admin of admins) {
+      await this.createNotification(admin.id, title, message, type, sendEmail, emailSubject);
+      count++;
+    }
+
+    this.logger.log(`Notificação enviada para ${count} administradores`);
+    return count;
+  }
+
   /**
    * Notificar sobre agendamento de consulta
    */

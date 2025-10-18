@@ -36,4 +36,10 @@ export class AdminStatsDto {
 
   @ApiProperty({ description: 'Novos diagnósticos este mês' })
   newDiagnosesThisMonth: number;
+
+  @ApiProperty({ description: 'Diagnósticos agrupados por condição', type: 'object' })
+  diagnosisByCondition: Record<string, number>;
+
+  @ApiProperty({ description: 'Diagnósticos agrupados por severidade', type: 'object' })
+  diagnosisBySeverity: Record<string, number>;
 }

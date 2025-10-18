@@ -100,13 +100,46 @@ export class UserService {
     await this.getUserById(id);
 
     // Extrair campos aninhados para atualização separada
-    const { medicalHistory, preferences, birthDate, ...userData } = data;
+    const { medicalHistory, preferences, birthDate, currentPassword, newPassword, ...userData } = data as any;
 
     // Preparar dados do usuário com conversão de data se necessário
     const updateData = {
       ...userData,
       ...(birthDate && { birthDate: new Date(birthDate) }),
     };
+
+    // Se uma nova senha foi fornecida, validar e fazer hash
+    if (newPassword) {
+      if (!currentPassword) {
+        throw new BadRequestException('Senha atual é obrigatória para alterar a senha');
+      }
+
+      // Buscar o usuário com a senha atual para validação
+      const userWithPassword = await this.prisma.user.findUnique({
+        where: { id, deleted: false },
+        select: { password: true }
+      });
+
+      if (!userWithPassword) {
+        throw new NotFoundException('Usuário não encontrado');
+      }
+
+      // Verificar se a senha atual está correta
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, userWithPassword.password);
+      if (!isCurrentPasswordValid) {
+        throw new UnauthorizedException('Senha atual incorreta');
+      }
+
+      // Verificar se a nova senha é diferente da atual
+      const isSamePassword = await bcrypt.compare(newPassword, userWithPassword.password);
+      if (isSamePassword) {
+        throw new BadRequestException('A nova senha deve ser diferente da senha atual');
+      }
+
+      // Hash da nova senha
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+      updateData.password = hashedNewPassword;
+    }
 
     // Atualizar o usuário
     const updatedUser = await this.prisma.user.update({

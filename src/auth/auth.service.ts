@@ -9,7 +9,9 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { ClinicSignUpDto } from './dto/clinic-signup.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { UserRole, ClinicStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -87,6 +89,19 @@ export class AuthService {
       console.error('Erro ao criar notificação de boas-vindas:', error);
     }
 
+    // Notificar administradores sobre novo usuário
+    try {
+      await this.notificationsService.notifyAdmins(
+        '👤 Novo Utilizador Registado',
+        `Um novo utilizador se registou no sistema: ${user.name} (${user.email})`,
+        'info',
+        true,
+        'Novo Utilizador - Kumona Vision Care'
+      );
+    } catch (error) {
+      console.error('Erro ao notificar admins sobre novo usuário:', error);
+    }
+
     // Gerar token JWT
     const token = this.generateToken(user.id, user.email, user.role);
 
@@ -106,6 +121,159 @@ export class AuthService {
     });
   }
 
+  async clinicSignUp(clinicSignUpDto: ClinicSignUpDto) {
+    try {
+      console.log('🏥 [CLINIC SIGNUP] Dados recebidos:', {
+        name: clinicSignUpDto.name,
+        email: clinicSignUpDto.email,
+        nif: clinicSignUpDto.nif,
+        responsibleName: clinicSignUpDto.responsibleName
+      });
+
+      const { email, password, name, nif, ...clinicData } = clinicSignUpDto;
+
+      console.log('🔍 [CLINIC SIGNUP] Verificando se email já existe:', email);
+      // Verificar se o email já existe
+      const userExists = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (userExists) {
+        console.log('❌ [CLINIC SIGNUP] Email já existe:', email);
+        throw new ConflictException('Email já está em uso');
+      }
+
+      console.log('🔍 [CLINIC SIGNUP] Verificando se NIF já existe:', nif);
+      // Verificar se o NIF já existe (apenas clínicas não deletadas)
+      const clinicExists = await this.prisma.clinic.findFirst({
+        where: {
+          nif,
+          deleted: false
+        },
+      });
+
+      if (clinicExists) {
+        console.log('❌ [CLINIC SIGNUP] NIF já existe:', nif);
+        throw new ConflictException('NIF já está em uso');
+      }
+
+      console.log('🔐 [CLINIC SIGNUP] Gerando hash da senha...');
+      // Hash da senha
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Criar o usuário primeiro
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+        birthDate: new Date('1990-01-01'), // Data padrão para clínicas
+        role: UserRole.CLINIC,
+        medicalHistory: {
+          create: {
+            existingConditions: [],
+            familyHistory: [],
+            medications: [],
+          },
+        },
+        preferences: {
+          create: {
+            notificationsEnabled: true,
+            reminderFrequency: 'daily',
+            language: 'pt',
+          },
+        },
+      },
+      include: {
+        medicalHistory: true,
+        preferences: true,
+      },
+    });
+
+    // Criar a clínica
+    const clinic = await this.prisma.clinic.create({
+      data: {
+        name,
+        nif,
+        email,
+        userId: user.id,
+        status: ClinicStatus.PENDING, // Clínicas criadas via signup ficam pendentes
+        ...clinicData,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    const result = { user, clinic };
+
+    // Notificar administradores sobre nova clínica
+    try {
+      await this.notificationsService.notifyAdmins(
+        '🏥 Nova Clínica Registrada',
+        `Uma nova clínica se registrou no sistema: ${name} (${email})`,
+        'info',
+        true,
+        'Nova Clínica - Kumona Vision Care'
+      );
+    } catch (error) {
+      console.error('Erro ao notificar admins sobre nova clínica:', error);
+    }
+
+    // Enviar notificação de boas-vindas para a clínica
+    try {
+      console.log('🎉 [CLINIC SIGNUP] Enviando notificação de boas-vindas para a clínica...');
+      await this.notificationsService.createNotification(
+        user.id,
+        '🎉 Bem-vindo ao Kumona Vision Care!',
+        `Olá ${name}! Seu registro foi recebido com sucesso e está em análise. Você receberá uma notificação assim que sua clínica for aprovada pelo administrador. Enquanto isso, você pode fazer login no sistema com acesso limitado.`,
+        'success',
+        true,
+        'Bem-vindo ao Kumona Vision Care'
+      );
+      console.log('✅ [CLINIC SIGNUP] Notificação de boas-vindas enviada com sucesso');
+    } catch (error) {
+      console.error('❌ [CLINIC SIGNUP] Erro ao enviar notificação de boas-vindas:', error);
+    }
+
+    // Enviar email de confirmação para a clínica
+    try {
+      await this.emailService.sendNotificationEmail(
+        email,
+        'Registro de Clínica Recebido',
+        `Olá ${name}!\n\nSeu registro de clínica foi recebido com sucesso e está em análise.\n\nDetalhes do registro:\n- Nome: ${name}\n- Email: ${email}\n- NIF: ${nif}\n\nVocê receberá uma notificação por email assim que sua clínica for aprovada pelo administrador.\n\nEnquanto isso, você pode fazer login no sistema, mas terá acesso limitado até a aprovação.\n\nObrigado por escolher o Kumona Vision Care!`,
+        name
+      );
+      console.log('✅ [CLINIC SIGNUP] Email de confirmação enviado para a clínica');
+    } catch (error) {
+      console.error('❌ [CLINIC SIGNUP] Erro ao enviar email de confirmação para a clínica:', error);
+    }
+
+    // Gerar token JWT
+    const token = this.generateToken(result.user.id, result.user.email, result.user.role);
+
+    // Remover a senha do objeto de retorno
+    const { password: _, ...userResult } = result.user;
+
+    return {
+      user: userResult,
+      clinic: result.clinic,
+      token,
+      message: 'Clínica registrada com sucesso. Aguarde a aprovação do administrador.',
+    };
+    } catch (error) {
+      console.error('Erro no clinicSignUp:', error);
+      throw error;
+    }
+  }
+
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
@@ -115,6 +283,7 @@ export class AuthService {
       include: {
         medicalHistory: true,
         preferences: true,
+        clinic: true, // Incluir dados da clínica se for uma clínica
       },
     });
 
@@ -132,6 +301,32 @@ export class AuthService {
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    // Verificar se é uma clínica e validar seu status
+    if (user.role === UserRole.CLINIC) {
+      console.log(`🏥 [LOGIN] Usuário é uma clínica, verificando status...`);
+
+      if (!user.clinic) {
+        console.log(`❌ [LOGIN] Clínica não encontrada para usuário ${user.id}`);
+        throw new UnauthorizedException('Clínica não encontrada. Entre em contato com o suporte.');
+      }
+
+      console.log(`🏥 [LOGIN] Status da clínica: ${user.clinic.status}`);
+
+      if (user.clinic.status !== ClinicStatus.APPROVED) {
+        const statusMessages = {
+          [ClinicStatus.PENDING]: 'Sua clínica ainda está em análise. Aguarde a aprovação do administrador.',
+          [ClinicStatus.REJECTED]: 'Sua clínica foi rejeitada. Entre em contato com o suporte para mais informações.',
+          [ClinicStatus.SUSPENDED]: 'Sua clínica foi suspensa. Entre em contato com o suporte para mais informações.'
+        };
+
+        const message = statusMessages[user.clinic.status] || 'Sua clínica não está aprovada para acesso.';
+        console.log(`❌ [LOGIN] Clínica com status ${user.clinic.status} tentou fazer login`);
+        throw new UnauthorizedException(message);
+      }
+
+      console.log(`✅ [LOGIN] Clínica aprovada, permitindo login`);
     }
 
     // Gerar token JWT

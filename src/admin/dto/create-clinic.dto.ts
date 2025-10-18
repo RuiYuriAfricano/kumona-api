@@ -74,18 +74,17 @@ export class CreateClinicDto {
   @ApiProperty({ description: 'BI do responsável' })
   @IsString()
   @Matches(/^\d{9}[A-Z]{2}\d{3}$/, {
-    message: 'BI deve estar no formato NNNNNNNNNLLNNN (9 números + 2 letras + 3 números)'
+    message: 'BI deve seguir o formato: 9 números + 2 letras + 3 números (ex: 123456789AB123)'
   })
   responsibleBi: string;
 
-  @ApiPropertyOptional({ description: 'ORMED do médico responsável' })
+  @ApiPropertyOptional({ description: 'Número da Ordem dos Médicos' })
   @IsOptional()
   @IsString()
-  @Matches(/^ORMED-\d{5}$/, {
-    message: 'ORMED deve estar no formato ORMED-XXXXX'
-  })
-  responsibleOrmed?: string;
+  responsibleCrm?: string;
 
-  @ApiProperty({ description: 'ID do usuário que será associado à clínica' })
-  userId: number;
+  @ApiProperty({ description: 'Senha para o usuário da clínica' })
+  @IsString()
+  @Length(6, 50)
+  password: string;
 }

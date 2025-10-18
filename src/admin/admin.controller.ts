@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -69,28 +70,6 @@ export class AdminController {
     return this.adminService.getAllClinics(req.user.id, status);
   }
 
-  @Get('clinics/:id')
-  @ApiOperation({ summary: 'Obter detalhes de uma clínica específica (apenas admin)' })
-  @ApiParam({
-    name: 'id',
-    description: 'ID da clínica',
-    type: 'number'
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Detalhes da clínica retornados com sucesso'
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Clínica não encontrada'
-  })
-  async getClinicById(
-    @Request() req,
-    @Param('id', ParseIntPipe) clinicId: number
-  ) {
-    return this.adminService.getClinicById(req.user.id, clinicId);
-  }
-
   @Put('clinics/:id/status')
   @ApiOperation({ summary: 'Atualizar status de uma clínica (apenas admin)' })
   @ApiParam({
@@ -112,6 +91,51 @@ export class AdminController {
     @Body() updateStatusDto: UpdateClinicStatusDto
   ) {
     return this.adminService.updateClinicStatus(req.user.id, clinicId, updateStatusDto);
+  }
+
+  @Put('clinics/:id/suspend')
+  @ApiOperation({ summary: 'Suspender clínica (apenas admin)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da clínica',
+    type: 'number'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Clínica suspensa com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Clínica não encontrada'
+  })
+  async suspendClinic(
+    @Request() req,
+    @Param('id', ParseIntPipe) clinicId: number,
+    @Body() body: { reason?: string }
+  ) {
+    return this.adminService.suspendClinic(req.user.id, clinicId, body.reason);
+  }
+
+  @Delete('clinics/:id')
+  @ApiOperation({ summary: 'Deletar clínica (apenas admin)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da clínica',
+    type: 'number'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Clínica deletada com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Clínica não encontrada'
+  })
+  async deleteClinic(
+    @Request() req,
+    @Param('id', ParseIntPipe) clinicId: number
+  ) {
+    return this.adminService.deleteClinic(req.user.id, clinicId);
   }
 
   @Get('stats')
@@ -150,6 +174,50 @@ export class AdminController {
     return this.adminService.getAllUsers(req.user.id, role);
   }
 
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Obter detalhes de um usuário específico (apenas admin)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do usuário',
+    type: 'number'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalhes do usuário retornados com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Usuário não encontrado'
+  })
+  async getUserById(
+    @Request() req,
+    @Param('id', ParseIntPipe) userId: number
+  ) {
+    return this.adminService.getUserByIdWithStats(req.user.id, userId);
+  }
+
+  @Get('clinics/:id')
+  @ApiOperation({ summary: 'Obter detalhes de uma clínica específica (apenas admin)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da clínica',
+    type: 'number'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalhes da clínica retornados com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Clínica não encontrada'
+  })
+  async getClinicById(
+    @Request() req,
+    @Param('id', ParseIntPipe) clinicId: number
+  ) {
+    return this.adminService.getClinicByIdWithStats(req.user.id, clinicId);
+  }
+
   @Put('users/:id/promote-admin')
   @ApiOperation({ summary: 'Promover usuário para administrador (apenas admin)' })
   @ApiParam({
@@ -174,6 +242,34 @@ export class AdminController {
     @Param('id', ParseIntPipe) userId: number
   ) {
     return this.adminService.promoteToAdmin(req.user.id, userId);
+  }
+
+
+
+  @Delete('users/:id')
+  @ApiOperation({ summary: 'Deletar usuário (apenas admin)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do usuário',
+    type: 'number'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Usuário deletado com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acesso negado - apenas administradores'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Usuário não encontrado'
+  })
+  async deleteUser(
+    @Request() req,
+    @Param('id', ParseIntPipe) userId: number
+  ) {
+    return this.adminService.deleteUser(req.user.id, userId);
   }
 
   @Get('reports/overview')
