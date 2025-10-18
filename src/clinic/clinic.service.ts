@@ -1102,16 +1102,29 @@ export class ClinicService {
       throw new NotFoundException('Paciente não encontrado ou não pertence a esta clínica');
     }
 
+    // Separar alergias das condições existentes
+    const allergies = medicalHistoryData.existingConditions.filter(condition =>
+      condition.toLowerCase().includes('alergia') ||
+      condition.toLowerCase().includes('alérgico') ||
+      condition.toLowerCase().includes('alergia a') ||
+      condition.toLowerCase().includes('sensibilidade a')
+    );
+
+    const medicalConditions = medicalHistoryData.existingConditions.filter(condition =>
+      !condition.toLowerCase().includes('alergia') &&
+      !condition.toLowerCase().includes('alérgico') &&
+      !condition.toLowerCase().includes('alergia a') &&
+      !condition.toLowerCase().includes('sensibilidade a')
+    );
+
     // Atualizar o histórico médico do paciente
     const updatedPatient = await this.prisma.patient.update({
       where: { id: patientId },
       data: {
-        allergies: medicalHistoryData.existingConditions.filter(condition =>
-          condition.toLowerCase().includes('alergia') || condition.toLowerCase().includes('alérgico')
-        ),
+        allergies: allergies,
         medications: medicalHistoryData.medications,
         medicalHistory: [
-          ...medicalHistoryData.existingConditions,
+          ...medicalConditions,
           ...medicalHistoryData.familyHistory
         ]
       }

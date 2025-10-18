@@ -318,20 +318,21 @@ PERFIL DO USUÁRIO:
 - Medicações: ${medications}
 - Diagnósticos recentes: ${recentDiagnoses}
 
-INSTRUÇÕES:
-1. Crie dicas práticas, específicas e baseadas em evidências científicas
-2. Use linguagem acessível e amigável
-3. Considere a idade e condições específicas do usuário
-4. Inclua dicas preventivas e de manutenção da saúde ocular
-5. Varie as categorias: higiene, exercícios, alimentação, ambiente, tecnologia
+INSTRUÇÕES IMPORTANTES:
+1. PRIORIZE SEMPRE as condições dos diagnósticos recentes - se há catarata, glaucoma, retinopatia diabética, etc., as dicas devem ser ESPECÍFICAS para essas condições
+2. Para CATARATA: inclua dicas sobre proteção UV, antioxidantes, cirurgia, sintomas a monitorar
+3. Para GLAUCOMA: inclua dicas sobre pressão intraocular, exames regulares, medicação
+4. Para RETINOPATIA DIABÉTICA: inclua dicas sobre controle glicêmico, exames de fundo de olho
+5. Use linguagem acessível e amigável, mas seja específico para a condição diagnosticada
+6. Varie as categorias: higiene, exercícios, alimentação, ambiente, tecnologia, tratamento
 
 FORMATO DE RESPOSTA (JSON válido):
 {
   "tips": [
     {
-      "title": "Título da dica",
-      "description": "Descrição detalhada da dica",
-      "category": "higiene|exercicios|alimentacao|ambiente|tecnologia",
+      "title": "Título da dica específica para a condição",
+      "description": "Descrição detalhada focada na condição diagnosticada",
+      "category": "higiene|exercicios|alimentacao|ambiente|tecnologia|tratamento",
       "priority": "low|medium|high",
       "iconType": "eye|shield|sun|water|food|exercise|tech"
     }
