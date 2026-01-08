@@ -5,13 +5,15 @@ import {
   UseGuards,
   Request,
   HttpStatus,
-  ForbiddenException
+  ForbiddenException,
+  Query
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiBearerAuth
+  ApiBearerAuth,
+  ApiQuery
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MLTrainingService } from './ml-training.service';
@@ -29,8 +31,6 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('Machine Learning')
 @Controller('ml')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class MLController {
   constructor(
     private readonly mlTrainingService: MLTrainingService,
@@ -50,7 +50,57 @@ export class MLController {
     }
   }
 
+  @Get('corrections')
+  @ApiOperation({ summary: 'Obter correções de especialistas para retreinamento (público)' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Limite de correções a retornar'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Correções retornadas com sucesso'
+  })
+  async getCorrections(@Query('limit') limit?: number) {
+    const maxLimit = limit ? Math.min(limit, 1000) : 1000;
+
+    // Buscar diagnósticos validados com correções
+    const diagnoses = await this.prisma.patientDiagnosis.findMany({
+      where: {
+        validated: true,
+        correctedCondition: {
+          not: null
+        }
+      },
+      take: maxLimit,
+      select: {
+        id: true,
+        imageUrl: true,
+        condition: true,
+        correctedCondition: true,
+        correctedSeverity: true,
+        severity: true,
+        specialistNotes: true,
+        validatedAt: true,
+        validatedBy: true
+      }
+    });
+
+    // Filtrar apenas os que têm correção diferente da condição original
+    const corrections = diagnoses.filter(
+      d => d.correctedCondition && d.correctedCondition !== d.condition
+    );
+
+    return {
+      data: corrections,
+      total: corrections.length
+    };
+  }
+
   @Get('stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Obter estatísticas de aprendizado de máquina (apenas admin)' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -66,6 +116,8 @@ export class MLController {
   }
 
   @Post('retrain')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Forçar retreinamento do modelo (apenas admin)' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -81,6 +133,8 @@ export class MLController {
   }
 
   @Get('training-data')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Visualizar dados de treinamento disponíveis (apenas admin)' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -95,9 +149,9 @@ export class MLController {
     };
   }> {
     await this.verifyAdminRole(req.user.id);
-    
+
     const trainingData = await this.mlTrainingService.collectTrainingData();
-    
+
     return {
       availableExamples: trainingData.length,
       examples: trainingData.slice(0, 10), // Mostrar apenas os primeiros 10 para preview

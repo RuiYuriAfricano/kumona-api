@@ -229,7 +229,8 @@ export class PatientDiagnosisService {
     page: number = 1,
     limit: number = 10,
     status?: string,
-    search?: string
+    search?: string,
+    hasCorrections?: string
   ) {
     const clinic = await this.verifyClinicRole(userId);
 
@@ -239,11 +240,24 @@ export class PatientDiagnosisService {
 
     // Filtro por status
     if (status) {
-      if (status === 'PENDING') {
+      if (status === 'PENDING' || status === 'pending') {
         where.validated = false;
-      } else if (status === 'VALIDATED') {
+      } else if (status === 'VALIDATED' || status === 'validated') {
         where.validated = true;
       }
+    }
+
+    // Filtro por correções (diagnósticos onde a IA errou)
+    if (hasCorrections === 'true') {
+      where.validated = true;
+      where.correctedCondition = {
+        not: null
+      };
+      where.NOT = {
+        correctedCondition: {
+          equals: where.condition
+        }
+      };
     }
 
     // Filtro por busca (nome do paciente ou condição)
