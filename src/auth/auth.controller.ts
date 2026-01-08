@@ -6,6 +6,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { ClinicSignUpDto } from './dto/clinic-signup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -50,10 +51,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Solicitar recuperação de senha',
-    description: 'Envia um email com link para redefinir a senha'
+    description: 'Envia um email com código OTP para redefinir a senha'
   })
   @ApiBody({ type: ForgotPasswordDto, description: 'Email para recuperação' })
-  @ApiResponse({ status: 200, description: 'Email de recuperação enviado com sucesso' })
+  @ApiResponse({ status: 200, description: 'Código OTP enviado com sucesso' })
   @ApiResponse({ status: 404, description: 'Email não encontrado' })
   @ApiResponse({ status: 400, description: 'Dados de entrada inválidos' })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto, @Req() req: Request) {
@@ -71,15 +72,43 @@ export class AuthController {
     return this.authService.forgotPassword(forgotPasswordDto, frontendUrl);
   }
 
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verificar código OTP',
+    description: 'Verifica se o código OTP fornecido é válido'
+  })
+  @ApiBody({ type: VerifyOtpDto, description: 'Email e código OTP' })
+  @ApiResponse({ status: 200, description: 'Código OTP verificado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Código OTP inválido ou expirado' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyOtp(verifyOtpDto.email, verifyOtpDto.otp);
+  }
+
+  @Post('verify-registration-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verificar código OTP de registro',
+    description: 'Verifica o código OTP e ativa a conta do usuário'
+  })
+  @ApiBody({ type: VerifyOtpDto, description: 'Email e código OTP' })
+  @ApiResponse({ status: 200, description: 'Email verificado e conta ativada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Código OTP inválido ou expirado' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async verifyRegistrationOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyRegistrationOtp(verifyOtpDto.email, verifyOtpDto.otp);
+  }
+
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Redefinir senha',
-    description: 'Redefine a senha do usuário usando o token de recuperação'
+    description: 'Redefine a senha do usuário usando o código OTP'
   })
-  @ApiBody({ type: ResetPasswordDto, description: 'Token e nova senha' })
+  @ApiBody({ type: ResetPasswordDto, description: 'Email, OTP e nova senha' })
   @ApiResponse({ status: 200, description: 'Senha redefinida com sucesso' })
-  @ApiResponse({ status: 400, description: 'Token inválido ou expirado' })
+  @ApiResponse({ status: 400, description: 'Código OTP inválido ou expirado' })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);

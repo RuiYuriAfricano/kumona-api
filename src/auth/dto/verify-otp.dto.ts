@@ -1,7 +1,7 @@
-import { IsString, IsNotEmpty, MinLength, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class ResetPasswordDto {
+export class VerifyOtpDto {
   @ApiProperty({
     description: 'Email do usuário',
     example: 'usuario@exemplo.com'
@@ -17,14 +17,5 @@ export class ResetPasswordDto {
   @IsString({ message: 'OTP deve ser uma string' })
   @IsNotEmpty({ message: 'OTP é obrigatório' })
   otp: string;
-
-  @ApiProperty({
-    description: 'Nova senha do usuário',
-    example: 'MinhaNovaSenh@123',
-    minLength: 8
-  })
-  @IsString({ message: 'Nova senha deve ser uma string' })
-  @IsNotEmpty({ message: 'Nova senha é obrigatória' })
-  @MinLength(8, { message: 'Nova senha deve ter pelo menos 8 caracteres' })
-  newPassword: string;
 }
+

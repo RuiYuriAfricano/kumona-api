@@ -41,13 +41,23 @@ export class AuthService {
     // Converter a data de nascimento para o formato ISO-8601 DateTime completo
     const formattedBirthDate = new Date(birthDate);
 
-    // Criar o usuário
+    // Gerar código OTP de 6 dígitos
+    const otp = this.generateOtp();
+
+    // Definir expiração do OTP (10 minutos a partir de agora)
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+
+    // Criar o usuário com emailVerified = false
     const user = await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
         birthDate: formattedBirthDate,
+        emailVerified: false, // Email não verificado ainda
+        otp, // Salvar OTP para verificação
+        otpExpiry, // Salvar expiração do OTP
         medicalHistory: {
           create: {
             existingConditions: [],
@@ -69,20 +79,91 @@ export class AuthService {
       },
     });
 
-    // Enviar email de boas-vindas (não bloquear o registro se falhar)
+    // Enviar email com OTP de verificação
     try {
-      await this.emailService.sendWelcomeEmail(user.email, user.name);
+      const emailSent = await this.emailService.sendEmailVerificationOtp(user.email, otp, user.name);
+
+      if (!emailSent) {
+        console.warn('Falha ao enviar email de verificação, mas continuando...');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar email de verificação:', error);
+      // Não falhar o registro por causa do email
+    }
+
+    // Log para desenvolvimento
+    console.log(`OTP de verificação para ${email}: ${otp}`);
+    console.log(`OTP expira em: ${otpExpiry.toISOString()}`);
+
+    return {
+      success: true,
+      message: 'Código de verificação enviado para seu email!',
+      email: user.email,
+      // Em desenvolvimento, incluir o OTP para facilitar testes
+      ...(process.env.NODE_ENV === 'development' && { otp })
+    };
+  }
+
+  /**
+   * Verificar OTP de registro e ativar conta
+   */
+  async verifyRegistrationOtp(email: string, otp: string) {
+    // Buscar usuário pelo email
+    const user = await this.prisma.user.findUnique({
+      where: { email, deleted: false },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    // Verificar se o email já foi verificado
+    if (user.emailVerified) {
+      throw new BadRequestException('Email já foi verificado');
+    }
+
+    // Verificar se o OTP existe
+    if (!user.otp) {
+      throw new BadRequestException('Código de verificação não encontrado. Solicite um novo código.');
+    }
+
+    // Verificar se o OTP expirou
+    if (user.otpExpiry && new Date() > user.otpExpiry) {
+      throw new BadRequestException('Código de verificação expirado. Solicite um novo código.');
+    }
+
+    // Verificar se o OTP está correto
+    if (user.otp !== otp) {
+      throw new BadRequestException('Código de verificação inválido');
+    }
+
+    // Atualizar usuário: marcar email como verificado e limpar OTP
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        otp: null,
+        otpExpiry: null,
+      },
+      include: {
+        medicalHistory: true,
+        preferences: true,
+      },
+    });
+
+    // Enviar email de boas-vindas
+    try {
+      await this.emailService.sendWelcomeEmail(updatedUser.email, updatedUser.name);
     } catch (error) {
       console.error('Erro ao enviar email de boas-vindas:', error);
-      // Não falhar o registro por causa do email
     }
 
     // Criar notificação de boas-vindas
     try {
       await this.notificationsService.createNotification(
-        user.id,
+        updatedUser.id,
         '🎉 Bem-vindo ao Kumona Vision Care!',
-        `Olá ${user.name}! Sua conta foi criada com sucesso. Explore nossos recursos de diagnóstico e prevenção para cuidar da sua saúde ocular.`,
+        `Olá ${updatedUser.name}! Sua conta foi criada com sucesso. Explore nossos recursos de diagnóstico e prevenção para cuidar da sua saúde ocular.`,
         'success'
       );
     } catch (error) {
@@ -93,7 +174,7 @@ export class AuthService {
     try {
       await this.notificationsService.notifyAdmins(
         '👤 Novo Utilizador Registado',
-        `Um novo utilizador se registou no sistema: ${user.name} (${user.email})`,
+        `Um novo utilizador se registou no sistema: ${updatedUser.name} (${updatedUser.email})`,
         'info',
         true,
         'Novo Utilizador - Kumona Vision Care'
@@ -103,12 +184,14 @@ export class AuthService {
     }
 
     // Gerar token JWT
-    const token = this.generateToken(user.id, user.email, user.role);
+    const token = this.generateToken(updatedUser.id, updatedUser.email, updatedUser.role);
 
     // Remover a senha do objeto de retorno
-    const { password: _, ...result } = user;
+    const { password: _, ...result } = updatedUser;
 
     return {
+      success: true,
+      message: 'Email verificado com sucesso!',
       user: result,
       token,
     };
@@ -303,6 +386,47 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    // Verificar se o email foi verificado (apenas para usuários normais, não clínicas)
+    if (user.role === UserRole.USER && !user.emailVerified) {
+      // Gerar novo código OTP
+      const otp = this.generateOtp();
+
+      // Definir expiração do OTP (10 minutos a partir de agora)
+      const otpExpiry = new Date();
+      otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+
+      // Atualizar OTP no banco de dados
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          otp,
+          otpExpiry,
+        },
+      });
+
+      // Enviar email com novo OTP
+      try {
+        await this.emailService.sendEmailVerificationOtp(user.email, otp, user.name);
+      } catch (error) {
+        console.error('Erro ao enviar email de verificação:', error);
+      }
+
+      // Log para desenvolvimento
+      console.log(`Novo OTP de verificação para ${email}: ${otp}`);
+      console.log(`OTP expira em: ${otpExpiry.toISOString()}`);
+
+      // Lançar exceção com informação de que um novo código foi enviado
+      throw new UnauthorizedException(
+        JSON.stringify({
+          message: 'Email não verificado. Um novo código de verificação foi enviado para seu email.',
+          emailNotVerified: true,
+          email: user.email,
+          // Em desenvolvimento, incluir o OTP para facilitar testes
+          ...(process.env.NODE_ENV === 'development' && { otp })
+        })
+      );
+    }
+
     // Verificar se é uma clínica e validar seu status
     if (user.role === UserRole.CLINIC) {
       console.log(`🏥 [LOGIN] Usuário é uma clínica, verificando status...`);
@@ -376,6 +500,13 @@ export class AuthService {
     }
   }
 
+  /**
+   * Gerar código OTP de 6 dígitos
+   */
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto, frontendUrl?: string) {
     const { email } = forgotPasswordDto;
 
@@ -388,15 +519,25 @@ export class AuthService {
       throw new NotFoundException('Email não encontrado. Verifique se o email está correto ou cadastre-se primeiro.');
     }
 
-    // Gerar token de recuperação (válido por 1 hora)
-    const resetToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, type: 'password-reset' },
-      { expiresIn: '1h' }
-    );
+    // Gerar código OTP de 6 dígitos
+    const otp = this.generateOtp();
 
-    // Enviar email de recuperação
+    // Definir expiração do OTP (10 minutos a partir de agora)
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+
+    // Salvar OTP no banco de dados
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        otp,
+        otpExpiry,
+      },
+    });
+
+    // Enviar email com OTP
     try {
-      const emailSent = await this.emailService.sendPasswordResetEmail(user.email, resetToken, user.name, frontendUrl);
+      const emailSent = await this.emailService.sendPasswordResetOtp(user.email, otp, user.name);
 
       if (!emailSent) {
         console.warn('Falha ao enviar email de recuperação, mas continuando...');
@@ -407,79 +548,126 @@ export class AuthService {
     }
 
     // Log para desenvolvimento
-    console.log(`Token de recuperação para ${email}: ${resetToken}`);
-    console.log(`Link de recuperação: http://localhost:5173/reset-password?token=${resetToken}`);
+    console.log(`OTP de recuperação para ${email}: ${otp}`);
+    console.log(`OTP expira em: ${otpExpiry.toISOString()}`);
 
     return {
       success: true,
-      message: 'Email de recuperação enviado com sucesso!',
-      // Em desenvolvimento, incluir o token para facilitar testes
-      ...(process.env.NODE_ENV === 'development' && { resetToken })
+      message: 'Código de verificação enviado com sucesso!',
+      // Em desenvolvimento, incluir o OTP para facilitar testes
+      ...(process.env.NODE_ENV === 'development' && { otp })
+    };
+  }
+
+  /**
+   * Verificar código OTP
+   */
+  async verifyOtp(email: string, otp: string) {
+    // Buscar usuário
+    const user = await this.prisma.user.findUnique({
+      where: { email, deleted: false },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    // Verificar se o OTP existe
+    if (!user.otp || !user.otpExpiry) {
+      throw new BadRequestException('Nenhum código de verificação foi solicitado para este email');
+    }
+
+    // Verificar se o OTP expirou
+    if (new Date() > user.otpExpiry) {
+      // Limpar OTP expirado
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { otp: null, otpExpiry: null },
+      });
+      throw new BadRequestException('Código de verificação expirado. Solicite um novo código');
+    }
+
+    // Verificar se o OTP está correto
+    if (user.otp !== otp) {
+      throw new BadRequestException('Código de verificação inválido');
+    }
+
+    // OTP válido - retornar sucesso
+    return {
+      success: true,
+      message: 'Código verificado com sucesso!',
+      email: user.email,
     };
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
-    const { token, newPassword } = resetPasswordDto;
+    const { email, otp, newPassword } = resetPasswordDto;
 
-    try {
-      // Verificar e decodificar o token
-      const payload = this.jwtService.verify(token) as JwtPayload & { type?: string };
+    // Buscar o usuário
+    const user = await this.prisma.user.findUnique({
+      where: { email, deleted: false },
+    });
 
-      // Verificar se é um token de reset de senha
-      if (payload.type !== 'password-reset') {
-        throw new BadRequestException('Token inválido');
-      }
-
-      // Buscar o usuário
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub, deleted: false },
-      });
-
-      if (!user) {
-        throw new NotFoundException('Usuário não encontrado');
-      }
-
-      // Hash da nova senha
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      console.log(`Atualizando senha para usuário ID: ${user.id}`);
-      console.log(`Hash da nova senha: ${hashedPassword.substring(0, 20)}...`);
-
-      // Atualizar a senha no banco de dados
-      const updatedUser = await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          password: hashedPassword,
-          updatedAt: new Date() // Forçar atualização do timestamp
-        },
-      });
-
-      console.log(`Senha atualizada com sucesso para usuário: ${updatedUser.email}`);
-      console.log(`Timestamp de atualização: ${updatedUser.updatedAt}`);
-
-      // Enviar notificação de mudança de senha por email
-      try {
-        await this.emailService.sendNotificationEmail(
-          updatedUser.email,
-          'Senha da sua conta foi alterada - Kumona',
-          `Sua senha foi alterada com sucesso em ${new Date().toLocaleString('pt-BR')}. Se você não fez esta alteração, entre em contato conosco imediatamente.`,
-          updatedUser.name
-        );
-      } catch (emailError) {
-        console.error('Erro ao enviar notificação de mudança de senha:', emailError);
-      }
-
-      return {
-        success: true,
-        message: 'Senha redefinida com sucesso!'
-      };
-
-    } catch (error) {
-      if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-        throw new BadRequestException('Token inválido ou expirado');
-      }
-      throw error;
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
     }
+
+    // Verificar se o OTP existe
+    if (!user.otp || !user.otpExpiry) {
+      throw new BadRequestException('Nenhum código de verificação foi solicitado');
+    }
+
+    // Verificar se o OTP expirou
+    if (new Date() > user.otpExpiry) {
+      // Limpar OTP expirado
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { otp: null, otpExpiry: null },
+      });
+      throw new BadRequestException('Código de verificação expirado. Solicite um novo código');
+    }
+
+    // Verificar se o OTP está correto
+    if (user.otp !== otp) {
+      throw new BadRequestException('Código de verificação inválido');
+    }
+
+    // Hash da nova senha
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    console.log(`Atualizando senha para usuário ID: ${user.id}`);
+    console.log(`Hash da nova senha: ${hashedPassword.substring(0, 20)}...`);
+
+    // Atualizar a senha e limpar o OTP
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        otp: null,
+        otpExpiry: null,
+        updatedAt: new Date()
+      },
+    });
+
+    console.log(`Senha atualizada com sucesso para usuário: ${updatedUser.email}`);
+    console.log(`Timestamp de atualização: ${updatedUser.updatedAt}`);
+
+    // Enviar notificação de mudança de senha por email
+    try {
+      await this.emailService.sendNotificationEmail(
+        updatedUser.email,
+        'Senha da sua conta foi alterada - Kumona',
+        `Sua senha foi alterada com sucesso em ${new Date().toLocaleString('pt-BR')}. Se você não fez esta alteração, entre em contato conosco imediatamente.`,
+        updatedUser.name
+      );
+    } catch (emailError) {
+      console.error('Erro ao enviar notificação de mudança de senha:', emailError);
+    }
+
+    return {
+      success: true,
+      message: 'Senha redefinida com sucesso!'
+    };
   }
 
   // Métodos para autenticação com Google

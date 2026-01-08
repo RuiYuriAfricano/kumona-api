@@ -32,7 +32,10 @@ model User {
   role            UserRole            @default(USER)
   deleted         Boolean             @default(false)
   isFirstLogin    Boolean             @default(true)
+  emailVerified   Boolean             @default(true) // Indica se o email foi verificado (true por padrão para usuários existentes)
   selectedClinicId Int?               // Clínica selecionada para acompanhamento
+  otp             String?             // Código OTP para recuperação de senha e verificação de email
+  otpExpiry       DateTime?           // Data de expiração do OTP
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
